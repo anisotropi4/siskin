@@ -1,2 +1,2 @@
 # siskin
-a transport network model
+A transport network model
