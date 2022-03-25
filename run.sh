@@ -32,7 +32,7 @@ fi
 FILE=OA-DZ-lookup.tsv
 if [ ! -s data/${FILE} ]; then
     FILEPATH=data/OA_DZ_IZ_2011.xlsx
-    xl2tsv.py --tab "OA_DZ_IZ_2011 Lookup" --path data --noempty ${FILEPATH}
+    ./xl2tsv.py --tab "OA_DZ_IZ_2011 Lookup" --path data --noempty ${FILEPATH}
     mv "data/OA_DZ_IZ_2011 Lookup.tsv" data/${FILE}
 fi
 
