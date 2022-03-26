@@ -49,7 +49,7 @@ do
     echo Processing ${STUB}
     FILE=Mid-2020-${STUB}.tsv
     if [ ! -s data/${FILE} ]; then
-        xl2tsv.py --tab "Mid-2020 Persons" --path data --noempty ${FILEPATH}
+        ./xl2tsv.py --tab "Mid-2020 Persons" --path data --noempty ${FILEPATH}
         tail -n +3 "data/Mid-2020 Persons.tsv" > data/${FILE}
     fi
     if [ -f "data/Mid-2020 Persons" ]; then
@@ -79,7 +79,6 @@ fi
 FILE=OA-2011-boundaries-SC-BFC.gpkg
 if [ ! -s data/${FILE} ]; then
     ogr2ogr -f GPKG data/${FILE} data/${STUB}.shp -t_srs EPSG:32630
-
 fi
 
 echo Download England and Wales MHW OA geography
