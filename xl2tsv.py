@@ -9,31 +9,25 @@ parser = argparse.ArgumentParser(description='Dump xls(x) files tab(s) to .tsv f
 
 parser.add_argument('inputfiles', type=str, nargs='*', help='name of xls-file to process')
 
-tabgroup = parser.add_mutually_exclusive_group()
-
-tabgroup.add_argument('--tabnames', dest='tabnames', action='store_true',
-                    default=False, help='dump name of tabs')
-
-tabgroup.add_argument('--tab', type=str, dest='tab', default=None,
-                    help='name of tab to process')
-
-tabgroup.add_argument('--ffill', dest='ffill', action='store_true',
-                      default=False, help='forward fill missing values')
-
-filegroup = parser.add_mutually_exclusive_group()
-
-filegroup.add_argument('--path', dest='path', type=str, default='output',
+parser.add_argument('--path', dest='path', type=str, default='output',
                     help='output directory file')
 
-filegroup.add_argument('--stdout', dest='stdout', action='store_true',
-                    default=False, help='dump a tab to stdout')
+parser.add_argument('--tab', type=str, dest='tab', default=None,
+                    help='name of tab to process')
 
-parser.add_argument('--sourcename', dest='sourcename', action='store_true',
-                    default=False, help='prepend filename to output tab file')
+parser.add_argument('--tabnames', dest='tabnames', action='store_true',
+                    default=False, help='dump name of tabs')
+
+parser.add_argument('--noempty', dest='noempty', action='store_true',
+                    default=False, help='remove blank lines')
+
+parser.add_argument('--filename', dest='filename', action='store_true',
+                    default=False, help='add filename to output file')
 
 args = parser.parse_args()
 
 path = args.path
+noempty = args.noempty
 
 if not os.path.exists(path):
     os.makedirs(path)
@@ -46,33 +40,31 @@ if args.tabnames:
         print('\t'.join(df.keys()))
     sys.exit(0)
 
-for filename in args.inputfiles:    
+if args.filename:
+    filebase = filename + ':'
+    if '.' in filename:
+        filebase = filename.rsplit('.', 1)[0] + ':'
+
+for filename in args.inputfiles:
+    filebase = ''
     if args.tab:
         tab = args.tab
-        filebase = ''
-        if args.sourcename:
-            filebase = filename + ':'
-            if '.' in filename:
-                filebase = filename.rsplit('.', 1)[0] + ':'
         try:
             df = pd.read_excel(filename, tab)
-            if args.ffill:
-                df = df.fillna(method='ffill')
-            if args.stdout:
-                df.to_csv(sys.stdout, index=False, sep='\t')     
-            else:
-                df.to_csv('{}/{}{}.tsv'.format(path, filebase, tab), index=False, sep='\t')
+            if noempty:
+                df = df.dropna(how='all')
+            df.to_csv('{}/{}{}.tsv'.format(path, filebase, tab), index=False, sep='\t')
         except KeyError:
             pass
     else:
         df = pd.read_excel(filename, None)
-        filebase = ''
-        if args.sourcename:
+        if args.filename:
             filebase = filename + ':'
             if '.' in filename:
                 filebase = filename.rsplit('.', 1)[0] + ':'
         for tab in df.keys():
-            if args.ffill:
-                df[tab] = df[tab].fillna(method='ffill')
-            df[tab].to_csv('{}/{}{}.tsv'.format(path, filebase, tab), index=False, sep='\t')
+            if noempty:
+                df[tab].dropna(how='all').to_csv('{}/{}{}.tsv'.format(path, filebase, tab), index=False, sep='\t')
+            else:
+                df[tab].to_csv('{}/{}{}.tsv'.format(path, filebase, tab), index=False, sep='\t')
 
