@@ -4,6 +4,10 @@ import os
 
 import pandas as pd
 import geopandas as gp
+
+from shapely.validation import make_valid
+from shapely.geometry import Polygon
+
 from herbert.base import archive
 from herbert.people import get_density
 
@@ -49,6 +53,7 @@ FIELDS = ['OA', 'LSOA', 'MSOA', 'Country', 'area', 'population']
 POPULATION = SCB.rename(columns=KEYS)[FIELDS]
 FIELDS = ['OA', 'Country', 'geometry']
 GEOGRAPHY = SCB.rename(columns=KEYS)[FIELDS]
+del SCB
 
 print('Load England & Wales data')
 DF0 = pd.read_csv('data/OA-MS-LS.csv')
@@ -92,6 +97,8 @@ FIELDS = ['OA', 'Country', 'geometry']
 GEOGRAPHY = pd.concat([GEOGRAPHY, EWB[FIELDS]])
 GEOGRAPHY = GEOGRAPHY.sort_values('OA').reset_index(drop=True)
 
+del EWB
+
 FIELDS = ['LSOA', 'MSOA', 'area', 'population', 'density']
 GEOGRAPHY = GEOGRAPHY.join(POPULATION.set_index('OA')[FIELDS], on='OA')
 
@@ -110,6 +117,7 @@ print('Write grid')
 GRIDPATH = 'grid.gpkg'
 archive(GRIDPATH)
 GRID.to_crs(CRS).to_file(GRIDPATH, driver='GPKG', layer='OA')
+del GRID
 
 print('Write Geography')
 FILEPATH = 'geography.gpkg'
@@ -127,6 +135,7 @@ DS4 = POPULATION[KEYS].drop_duplicates().set_index('LSOA')
 LSOA = LSOA.join(DS4).reset_index()
 FIELDS = ['LSOA', 'MSOA', 'Country', 'area', 'population', 'density', 'geometry']
 LSOA = LSOA[FIELDS]
+del GEOGRAPHY
 
 print('Write LSOA geography')
 LSOA.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer='LSOA')
@@ -148,3 +157,13 @@ MSOA.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer='MSOA')
 
 CENTROID = MSOA.centroid.rename('geometry')
 MSOA.drop('geometry', axis=1).join(CENTROID).to_crs(CRS).to_file(GRIDPATH, driver='GPKG', layer='MSOA')
+
+print(f'Write GB outline')
+OUTER = MSOA['geometry'].apply(make_valid)
+OUTER = OUTER.reset_index().dissolve()
+
+DATA = gp.GeoSeries(OUTER.loc[0, 'geometry'].geoms).set_crs(CRS)
+OUTER = gp.GeoDataFrame(geometry=DATA.exterior.apply(Polygon).values)
+OUTER['area'] = OUTER.area
+OUTER = OUTER.sort_values('area', ascending=False).reset_index(drop=True)
+OUTER.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer='outer')
