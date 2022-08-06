@@ -40,7 +40,7 @@ DS2 = SCB[KEYS.keys()].rename(columns=KEYS).set_index('Zone').groupby('Zone').su
 DS2 = DS2[DS2.index.isin(DS1.index)]['population']
 
 SC1 = pd.Series(index=DS1.index, data=DS1.values / DS2.values, name='s')
-SCB['population'] = SCB['Popcount'] * SCB.join(SC1, on='DataZone').fillna(1.0)['s']
+SCB['population'] = SCB['Popcount'] * SCB.join(SC1, on='DataZone').fillna(0.0)['s']
 SCB['population'] = SCB['population'] * DS1.sum() / SCB['population'].sum()
 SCB['population'] = SCB['population'].round().astype(int)
 
@@ -141,7 +141,7 @@ print('Write LSOA geography')
 LSOA.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer='LSOA')
 
 CENTROID = LSOA.centroid.rename('geometry')
-LSOA.drop('geometry', axis=1).join(CENTROID).to_crs(CRS).to_file(GRIDPATH, driver='GPKG', layer='LSOA')
+gp.GeoDataFrame(LSOA.drop('geometry', axis=1), geometry=CENTROID).to_crs(CRS).to_file(GRIDPATH, driver='GPKG', layer='LSOA')
 
 print('Aggregate MSOA geography')
 MSOA = LSOA.dissolve(by='MSOA', aggfunc='sum')
@@ -156,7 +156,7 @@ print('Write MSOA geography')
 MSOA.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer='MSOA')
 
 CENTROID = MSOA.centroid.rename('geometry')
-MSOA.drop('geometry', axis=1).join(CENTROID).to_crs(CRS).to_file(GRIDPATH, driver='GPKG', layer='MSOA')
+gp.GeoDataFrame(MSOA.drop('geometry', axis=1), geometry=CENTROID).to_crs(CRS).to_file(GRIDPATH, driver='GPKG', layer='MSOA')
 
 print(f'Write GB outline')
 OUTER = MSOA['geometry'].apply(make_valid)
