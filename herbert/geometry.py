@@ -1,8 +1,8 @@
 from itertools import product, cycle
 import numpy as np
 import geopandas as gp
-from shapely.geometry import LineString, Polygon
-from .base import pairwise, restack
+from shapely.geometry import LineString, Polygon, Point
+from .base import pairwise, restack, reduce_mem_usage
 
 CRS = 'EPSG:32630'
 
@@ -36,8 +36,47 @@ def get_points(gf):
     except KeyError:
         return get_points(gf.rename('geometry').reset_index())
 
-def get_extent(gf, d=100.0):
-    r = np.array(gf['geometry'].bounds).reshape(-1, 2).T
+def get_boundary(gf, overlap=0.0):
+    """
+    Return rectangle array that covers area of GeoDataFrame extended by overlap
+
+    :param gf: GeoDataFrame
+    :param overlap: distance to extend coverage
+    """
+    offset = np.asarray([[-overlap, -overlap], [overlap, overlap]])
+    try:
+        r = gf.bounds
+    except AttributeError:
+        r = gf
+    return np.asarray([r.min().values[:2], r.max().values[2:]]) + offset
+
+def get_boundaries(gf, overlap=0.0):
+    """
+    Return rectangle array that covers area of GeoDataFrame extended by overlap
+
+    :param gf: GeoDataFrame
+    :param overlap: distance to extend coverage
+    """
+    offset = np.asarray([[-overlap, -overlap], [overlap, overlap]])
+    r = gf.bounds
+    return r.values.reshape(-1, 2, 2) + offset
+
+def get_extent(u, d=100.0):
+    """
+    Return x, y integer units of distance 'd' that would covers the extent of
+    GeoDataFrame, or its numpy extent array
+
+    :param u: GeoDataFrame or numpy array
+    :param d: distance parameter
+    """
+    try:
+        r = np.array(u.bounds).reshape(-1, 2).T
+    except AttributeError as e:
+        try:
+            return get_extent(u['geometry'], d)
+        except TypeError:
+            pass
+        r = u.T
     return (np.ceil(np.diff(r) / d)).astype(int).reshape(-1)
 
 def get_centres(gf):
@@ -76,7 +115,6 @@ def get_meshframe(gf, centre, d, crs=CRS):
     :param d: square edge size
     :param crs: geographic projection code
     """
-
     xy = get_extent(gf, d)
     mesh = get_mesharray(xy, centre, d)
     r = gp.GeoDataFrame(geometry=gp.points_from_xy(*mesh.T)).set_crs(crs)
@@ -98,6 +136,24 @@ def get_meshframe2(gf, centre, d, crs=CRS):
     mesh = restack(*xy)
     points = iter(centre + d * (mesh - xy / 2.0))
     return gp.GeoDataFrame(geometry=[Polygon(v) for v in points]).set_crs(CRS)
+
+
+def get_meshpoints(gf, d, crs=CRS):
+    """
+    Return GeoDataFrame of square center-points that cover GeoDataFrame 'gf'
+    :param gf: GeoDataFrame to be covered in squares
+    :param centre: GeoDataFrame centre point
+    :param d: square side length
+    :param crs: coordinate reference projection geometry string
+    """
+
+    boundary = get_boundary(gf, d)
+    extent = get_extent(boundary, d)
+    centre = boundary.T.sum(axis=1) / 2.0
+    xn, yn = extent
+    mesh = product(range(xn), range(yn))
+    points = (Point(centre + d * (np.asarray(p) - extent / 2.0)) for p in mesh)
+    return gp.GeoDataFrame(geometry=list(points)).set_crs(CRS)
 
 def get_squares(points, d, boost=0.0):
     """
@@ -152,3 +208,21 @@ def get_triangles(triangles, data, points, crs=CRS):
     r = gp.GeoDataFrame(columns=['A', 'B', 'C'], data=data, geometry=G)
     r.index = ['S{}'.format(str(i+1).zfill(5)) for i in r.index]
     return r.set_crs(crs)
+
+def gf_reduce_mem_usage(gf, output=True, drop=True):
+    """ iterate through all the columns of a GeoDataFrame, drop non-numerical
+        data and modify the data type to reduce memory usag
+        https://www.kaggle.com/gemartin/load-data-reduce-memory-usage
+    """
+    if output:
+        start_mem = gf.memory_usage(deep=True).sum() / 1024**2
+        print('Memory usage of dataframe is {:.2f} MB'.format(start_mem))
+    gs = gf['geometry']
+    gf = gf.drop(columns='geometry')
+    gf = reduce_mem_usage(gf, output=False, drop=drop)
+    gf['geometry'] = gs
+    if output:
+        end_mem = gf.memory_usage(deep=True).sum() / 1024**2
+        print('Memory usage after optimization is: {:.2f} MB'.format(end_mem))
+        print('Decreased by {:.1f}%'.format(100 * (start_mem - end_mem) / start_mem))
+    return gf
