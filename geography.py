@@ -161,9 +161,22 @@ MSOA.drop('geometry', axis=1).join(CENTROID).to_crs(CRS).to_file(GRIDPATH, drive
 print(f'Write GB outline')
 OUTER = MSOA['geometry'].apply(make_valid)
 OUTER = OUTER.reset_index().dissolve()
-
-DATA = gp.GeoSeries(OUTER.loc[0, 'geometry'].geoms).set_crs(CRS)
-OUTER = gp.GeoDataFrame(geometry=DATA.exterior.apply(Polygon).values)
+OUTER = OUTER.explode(ignore_index=True).drop(columns='index')
+OUTER['geometry'] = OUTER.exterior
+OUTER['geometry'] = OUTER['geometry'].apply(Polygon)
 OUTER['area'] = OUTER.area
 OUTER = OUTER.sort_values('area', ascending=False).reset_index(drop=True)
-OUTER.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer='outer')
+
+BRITAIN = OUTER[OUTER['area'] > 1.0E8].copy()
+BRITAIN['geometry'] = BRITAIN.simplify(10, preserve_topology=False)
+GS1 = BRITAIN['geometry'].simplify(100)
+BRITAIN = BRITAIN[GS1.distance(GS1[0]) < 2.0E3]
+BRITAIN = BRITAIN.dissolve()
+BRITAIN.to_file('britain.gpkg', driver='GPKG', layer='outer')
+
+GS2 = OUTER.centroid
+G = BRITAIN.loc[0, 'geometry']
+IDX1 = GS2.within(G)
+OUTER = OUTER.loc[IDX1]
+
+OUTER.to_file(FILEPATH, driver='GPKG', layer='outer')
