@@ -5,6 +5,7 @@ from joblib import cpu_count
 
 import pandas as pd
 import geopandas as gp
+from shapely.geometry import Polygon
 from sklearn.cluster import MiniBatchKMeans
 
 from herbert.base import archive, scale_series
@@ -57,8 +58,8 @@ WEIGHTS = {'base' : list(range(POINTS.index.shape[0])),
 
 WEIGHTS = {'p2' : scale_series(GEOGRAPHY['population']) ** 2, }
 
-FILEPATH = 'bkm64.gpkg'
-archive(FILEPATH)
+OUTPATH = 'bkm64.gpkg'
+archive(OUTPATH)
 print(dt.datetime.now() - START)
 
 KEY = None
@@ -75,68 +76,126 @@ for k, WEIGHT in WEIGHTS.items():
     KEYS = ['area', 'population', 'class']
     DATA = GEOGRAPHY[KEYS].groupby('class').sum().reset_index()
     CENTRES = gp.GeoDataFrame(DATA, geometry=gp.points_from_xy(*CLUSTER.cluster_centers_.T)).set_crs(CRS)
-    CENTRES.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer=f'fit {k}')
+    CENTRES.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer=f'fit {k}')
 print(dt.datetime.now() - START)
 
 print('Find boundaries')
 KEYS = ['area', 'population', 'geometry', 'class']
 BKM = GEOGRAPHY[KEYS].dissolve(by='class', aggfunc='sum')
-
 print('Write boundaries')
 BKM = BKM.reset_index()
-BKM.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer=f'fit {KEY} boundary')
 
-print(dt.datetime.now() - START)
 print('Find boundaries 2')
 SPLIT = BKM.explode(index_parts=True)
+SPLIT = SPLIT.reset_index()
 SPLIT['sarea'] = SPLIT.area
-SPLIT['key'] = 0
-IDX1 = (SPLIT['sarea'] > 1.0E6) & (SPLIT['sarea'] < 5.0E8)
-SPLIT.loc[IDX1, 'key'] = SPLIT[IDX1].reset_index().index + 1
+IDX1 = SPLIT['sarea'] > 5.0E7
+BOUNDARIES = SPLIT.loc[IDX1]
+BOUNDARIES['geometry'] = BOUNDARIES['geometry'].apply(lambda v: Polygon(v.exterior))
+SPLIT['key'] = SPLIT['class']
 
-SPLIT = SPLIT.sort_values(['class', 'sarea'], ascending=False)
-IDX2 = SPLIT.drop_duplicates(subset='class').index
-SPLIT.loc[IDX2, 'key'] = 0
-SPLIT = SPLIT.sort_index()
-IDX3 = SPLIT['key'] == 0
+centres = SPLIT.loc[SPLIT.index.difference(IDX1)]
+centres['geometry'] = centres.centroid
+#SPLIT.to_file('debug.gpkg', driver='GPKG', layer='split1')
 
-GF1 = SPLIT[IDX3].dissolve(by='class', aggfunc='first').reset_index()
-GF1['sarea'] = GF1.area
-GF1['key'] = GF1['class']
-GF2 = SPLIT[~IDX3].reset_index(drop=True)
-BKM2 = GF1.copy()
+# Move centres back inside boundaries
+for k, v in BOUNDARIES.iterrows():
+    idx = centres[centres['class'] != v['class']].within(v['geometry'])
+    for m in idx[idx].index:
+        SPLIT.loc[m, 'key'] = v['class']
+
+#SPLIT.to_file('debug.gpkg', driver='GPKG', layer='split2')
+
+#BOUNDARIES.to_file('debug.gpkg', driver='GPKG', layer='boundary')
+#SPLIT.loc[IDX1].to_file('debug.gpkg', driver='GPKG', layer='big')
+#SPLIT[SPLIT['class'] != SPLIT['key']].to_file('debug.gpkg', driver='GPKG', layer='ex')
+
+SPLIT['class'] = SPLIT['key']
+KEYS = ['class', 'geometry']
+BKM = SPLIT[KEYS].dissolve(by='class', aggfunc='first')
+BKM['area'] = BKM.area
+
+POPULATION = gp.GeoDataFrame(data=GEOGRAPHY['population'], geometry=GEOGRAPHY.centroid)
+DF1 = BKM.reset_index()[['class', 'geometry']].sjoin(POPULATION).groupby('class').sum()
+BKM['population'] = DF1['population']
+
+BKM.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer=f'fit {KEY} boundary')
+#BKM.to_file('debug.gpkg', driver='GPKG', layer=f'fit {KEY} boundary')
+
 
 print(dt.datetime.now() - START)
+print('Find boundaries 3')
 
+# migrate sub-regions to largest shared border rather than BKM boundary
+SPLIT = BKM.explode(index_parts=True).reset_index()
+SPLIT['sarea'] = SPLIT.area
+SPLIT['key'] = SPLIT['class']
+
+SPLIT.to_file('debug.gpkg', driver='GPKG', layer='split3')
+
+# only migrate sub-regions between 10^6 and 10^9 m^2
+IDX1 = (SPLIT['sarea'] > 1.0E6) & (SPLIT['sarea'] < 5.0E8)
+IDX1 = IDX1[IDX1].index
+IDX2 = SPLIT.index.difference(IDX1)
+
+GF1 = SPLIT.loc[IDX2].dissolve(by='class', aggfunc='first').reset_index()
+GF1['sarea'] = GF1.area
+#GF1.to_file('debug.gpkg', driver='GPKG', layer='gf1')
+
+GF2 = SPLIT.loc[IDX1].reset_index(drop=True)
+#GF2.to_file('debug.gpkg', driver='GPKG', layer='gf2')
+
+print(dt.datetime.now() - START)
 for i, region in GF2.iterrows():
     gf = gp.GeoDataFrame([region], crs=CRS)
     idx = GF1[GF1.touches(region['geometry'])].index
-    
     if len(idx) == 0:
-        idx = pd.Index([region['class']])
-    if len(idx) > 1:
-        gs = GF1.loc[idx].intersection(region['geometry']).length
-        idx = gs.sort_values(ascending=False).index.take([0])
-    GF2.loc[i, 'key'] = idx.values[0]
-    #BKM2.loc[idx] = pd.concat([BKM2.loc[idx], gf]).dissolve().set_index(idx)
+        continue
+    gs = GF1.loc[idx].intersection(region['geometry']).length
+    m = gs.sort_values(ascending=False).index.take([0]).values[0]
+    GF2.loc[i, 'key'] = m
 
-BKM2 = pd.concat([GF1, GF2]).dissolve(by='key', aggfunc='first')
+GF2['class'] = GF2['key']
+
+# migrate sub-regions to closest region
+KEYS = ['class', 'geometry', 'key']
+BKM2 = pd.concat([GF1[KEYS], GF2[KEYS]]).dissolve(by='class', aggfunc='first')
+BKM2.to_file('debug.gpkg', driver='GPKG', layer='split4')
+
+SPLIT = BKM2.explode(index_parts=True).reset_index()
+SPLIT['sarea'] = SPLIT.area
+SPLIT.to_file('debug.gpkg', driver='GPKG', layer='split5')
+
+IDX3 = SPLIT[SPLIT['sarea'] > 1.0E8].index
+#IDX3 = SPLIT.sort_values(['class', 'sarea']).drop_duplicates(subset='class', keep='last').index
+
+GF3 = SPLIT.loc[IDX3].dissolve(by='class').reset_index()
+GF3.to_file('debug.gpkg', driver='GPKG', layer='gf3')
+IDX4 = SPLIT.index.difference(IDX3)
+GF4 = SPLIT.loc[IDX4]
+GF4.reset_index().to_file('debug.gpkg', driver='GPKG', layer='gf4')
+
+for i, region in GF4.iterrows():
+    m = GF3.distance(region['geometry'].centroid).idxmin()
+    if SPLIT.loc[i, 'class'] != GF3.loc[m, 'class']:
+        SPLIT.loc[i, 'class'] = GF3.loc[m, 'class']
+
+BKM2 = SPLIT.dissolve(by='class', aggfunc='first').reset_index()
 BKM2['area'] = BKM2.area
+BKM2.reset_index().to_file('debug.gpkg', driver='GPKG', layer='bkm2')
 
-POPULATION = gp.GeoDataFrame(data=GEOGRAPHY['population'], geometry=GEOGRAPHY.centroid)
-
-GF3 = gp.sjoin(BKM2[['class', 'geometry']], POPULATION, how='left')
-DF1 = GF3[['class', 'population']].groupby('class').sum()
+GF5 = gp.sjoin(BKM2[['class', 'geometry']], POPULATION, how='left')
+DF1 = GF5[['class', 'population']].groupby('class').sum()
 BKM2['population'] = DF1
 
-IDX4 = POPULATION.index.difference(GF3.set_index('index_right').index)
-GF4 = gp.sjoin_nearest(POPULATION.loc[IDX4], BKM2[['class', 'geometry']], how='left')
-DF2 = GF4[['class', 'population']].groupby('class').sum()
+IDX5 = POPULATION.index.difference(GF5.set_index('index_right').index)
+GF6 = gp.sjoin_nearest(POPULATION.loc[IDX5], BKM2[['class', 'geometry']], how='left')
+DF2 = GF6[['class', 'population']].groupby('class').sum()
 BKM2.loc[DF2.index, 'population'] += DF2['population']
 
 print(dt.datetime.now() - START)
 print('Write boundaries')
-BKM2.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer=f'fit2 {KEY} boundary')
+BKM2.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer=f'fit2 {KEY} boundary')
 
 print(dt.datetime.now() - START)
 print(f'Find towns {KEY}')
@@ -155,9 +214,9 @@ KEYS = ['population', 'area']
 TOWNS = TOWNS.join(BKM2[KEYS], on='class')
 TOWNS['density'] = get_density(TOWNS)
 
-TOWNS.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer=f'MSOA town d points {KEY}')
+TOWNS.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer=f'MSOA town d points {KEY}')
 # MSOA density gives the best locations
-TOWNS.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer=f'town points {KEY}')
+TOWNS.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer=f'town points {KEY}')
 
 KEYS = ['class', 'geometry']
 TOWNS = LSOA.sjoin(BKM2[KEYS], predicate='within').drop(columns='index_right')
@@ -169,7 +228,7 @@ KEYS = ['population', 'area']
 TOWNS = TOWNS.join(BKM2[KEYS], on='class')
 TOWNS['density'] = get_density(TOWNS)
 
-TOWNS.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer=f'LSOA town d points {KEY}')
+TOWNS.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer=f'LSOA town d points {KEY}')
 
 KEYS = ['class', 'geometry']
 TOWNS = MSOA.sjoin(BKM2[KEYS], predicate='within').drop(columns='index_right')
@@ -181,7 +240,7 @@ KEYS = ['population', 'area']
 TOWNS = TOWNS.join(BKM2[KEYS], on='class')
 TOWNS['density'] = get_density(TOWNS)
 
-TOWNS.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer=f'MSOA town p points {KEY}')
+TOWNS.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer=f'MSOA town p points {KEY}')
 
 KEYS = ['class', 'geometry']
 TOWNS = LSOA.sjoin(BKM2[KEYS], predicate='within').drop(columns='index_right')
@@ -193,6 +252,6 @@ KEYS = ['population', 'area']
 TOWNS = TOWNS.join(BKM2[KEYS], on='class')
 TOWNS['density'] = get_density(TOWNS)
 
-TOWNS.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer=f'LSOA town p points {KEY}')
+TOWNS.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer=f'LSOA town p points {KEY}')
 
 print(dt.datetime.now() - START)
