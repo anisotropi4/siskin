@@ -96,19 +96,12 @@ SPLIT['key'] = SPLIT['class']
 
 centres = SPLIT.loc[SPLIT.index.difference(IDX1)]
 centres['geometry'] = centres.centroid
-#SPLIT.to_file('debug.gpkg', driver='GPKG', layer='split1')
 
 # Move centres back inside boundaries
 for k, v in BOUNDARIES.iterrows():
     idx = centres[centres['class'] != v['class']].within(v['geometry'])
     for m in idx[idx].index:
         SPLIT.loc[m, 'key'] = v['class']
-
-#SPLIT.to_file('debug.gpkg', driver='GPKG', layer='split2')
-
-#BOUNDARIES.to_file('debug.gpkg', driver='GPKG', layer='boundary')
-#SPLIT.loc[IDX1].to_file('debug.gpkg', driver='GPKG', layer='big')
-#SPLIT[SPLIT['class'] != SPLIT['key']].to_file('debug.gpkg', driver='GPKG', layer='ex')
 
 SPLIT['class'] = SPLIT['key']
 KEYS = ['class', 'geometry']
@@ -120,8 +113,6 @@ DF1 = BKM.reset_index()[['class', 'geometry']].sjoin(POPULATION).groupby('class'
 BKM['population'] = DF1['population']
 
 BKM.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer=f'fit {KEY} boundary')
-#BKM.to_file('debug.gpkg', driver='GPKG', layer=f'fit {KEY} boundary')
-
 
 print(dt.datetime.now() - START)
 print('Find boundaries 3')
@@ -131,8 +122,6 @@ SPLIT = BKM.explode(index_parts=True).reset_index()
 SPLIT['sarea'] = SPLIT.area
 SPLIT['key'] = SPLIT['class']
 
-SPLIT.to_file('debug.gpkg', driver='GPKG', layer='split3')
-
 # only migrate sub-regions between 10^6 and 10^9 m^2
 IDX1 = (SPLIT['sarea'] > 1.0E6) & (SPLIT['sarea'] < 5.0E8)
 IDX1 = IDX1[IDX1].index
@@ -140,10 +129,8 @@ IDX2 = SPLIT.index.difference(IDX1)
 
 GF1 = SPLIT.loc[IDX2].dissolve(by='class', aggfunc='first').reset_index()
 GF1['sarea'] = GF1.area
-#GF1.to_file('debug.gpkg', driver='GPKG', layer='gf1')
 
 GF2 = SPLIT.loc[IDX1].reset_index(drop=True)
-#GF2.to_file('debug.gpkg', driver='GPKG', layer='gf2')
 
 print(dt.datetime.now() - START)
 for i, region in GF2.iterrows():
@@ -160,20 +147,16 @@ GF2['class'] = GF2['key']
 # migrate sub-regions to closest region
 KEYS = ['class', 'geometry', 'key']
 BKM2 = pd.concat([GF1[KEYS], GF2[KEYS]]).dissolve(by='class', aggfunc='first')
-BKM2.to_file('debug.gpkg', driver='GPKG', layer='split4')
 
 SPLIT = BKM2.explode(index_parts=True).reset_index()
 SPLIT['sarea'] = SPLIT.area
-SPLIT.to_file('debug.gpkg', driver='GPKG', layer='split5')
 
 IDX3 = SPLIT[SPLIT['sarea'] > 1.0E8].index
 #IDX3 = SPLIT.sort_values(['class', 'sarea']).drop_duplicates(subset='class', keep='last').index
 
 GF3 = SPLIT.loc[IDX3].dissolve(by='class').reset_index()
-GF3.to_file('debug.gpkg', driver='GPKG', layer='gf3')
 IDX4 = SPLIT.index.difference(IDX3)
 GF4 = SPLIT.loc[IDX4]
-GF4.reset_index().to_file('debug.gpkg', driver='GPKG', layer='gf4')
 
 for i, region in GF4.iterrows():
     m = GF3.distance(region['geometry'].centroid).idxmin()
@@ -182,7 +165,6 @@ for i, region in GF4.iterrows():
 
 BKM2 = SPLIT.dissolve(by='class', aggfunc='first').reset_index()
 BKM2['area'] = BKM2.area
-BKM2.reset_index().to_file('debug.gpkg', driver='GPKG', layer='bkm2')
 
 GF5 = gp.sjoin(BKM2[['class', 'geometry']], POPULATION, how='left')
 DF1 = GF5[['class', 'population']].groupby('class').sum()
@@ -199,8 +181,7 @@ BKM2.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer=f'fit2 {KEY} boundary')
 
 print(dt.datetime.now() - START)
 print(f'Find towns {KEY}')
-#KEYS = ['class', 'population']
-#KEYS = ['class', 'density']
+
 LSOA = gp.read_file('grid.gpkg', layer='LSOA').to_crs(CRS)
 MSOA = gp.read_file('grid.gpkg', layer='MSOA').to_crs(CRS)
 
