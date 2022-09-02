@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 
-import os
 import datetime as dt
-from itertools import cycle, tee
-import numpy as np
 from joblib import cpu_count
+
+import numpy as np
 
 import pandas as pd
 import geopandas as gp
-from shapely.geometry import LineString, Polygon
 
 from sklearn.cluster import MiniBatchKMeans
+from libpysal.cg import voronoi_frames
 
-from herbert.base import archive, scale_series
+from herbert.base import scale_series
 import herbert.geometry as hg
 
 pd.set_option('display.max_columns', None)
@@ -25,18 +24,24 @@ pd.set_option('display.max_columns', None)
 
 START = dt.datetime.now()
 
-LAYER = 'gridmap 128m'
-print(f'Load {LAYER}')
 CRS='EPSG:32630'
 FILEPATH = 'east-midlands.gpkg'
+
+LAYER = 'gridmap 128m'
+print(f'Load {LAYER}')
 
 try:
     GRID
 except NameError:
     GRID = gp.read_file(FILEPATH, layer=LAYER).to_crs(CRS)
 
-POINTS = hg.get_points(GRID.centroid)
+LAYER = 'boundary'
+try:
+    BOUNDARY
+except NameError:
+    BOUNDARY = gp.read_file(FILEPATH, layer=LAYER).to_crs(CRS)
 
+POINTS = hg.get_points(GRID)
 print(dt.datetime.now() - START)
 print('Create model')
 N = 1024
@@ -53,19 +58,17 @@ CLUSTER = MiniBatchKMeans(
 )
 print(dt.datetime.now() - START)
 
-WEIGHTS = {'p' : scale_series(GRID['p']),
-           'p2' : scale_series(GRID['p']) ** 2,}
-
+WEIGHTS = {'p' : scale_series(GRID['p']), 'p2' : scale_series(GRID['p']) ** 2,}
 WEIGHTS = {'p' : scale_series(GRID['p']), }
 
-FILEPATHB = 'em-grid.gpkg'
-for k, WEIGHT in WEIGHTS.items():
+OUTPATH = 'em-grid.gpkg'
+for k, weight in WEIGHTS.items():
     print(f'Fit model {k} number of clusters {N}')
-    CLUSTER.fit(POINTS, '', WEIGHT)
+    CLUSTER.fit(POINTS, '', weight)
     print(dt.datetime.now() - START)
-    LABELS = CLUSTER.labels_
-    GRID['em class'] = LABELS
-    GRID['name'] = [f'C{str(i).zfill(4)}' for i in (LABELS + 1)]
+    labels = CLUSTER.labels_
+    GRID['em class'] = labels
+    GRID['name'] = [f'C{str(i).zfill(4)}' for i in (labels + 1)]
     print('Write model')
     print(dt.datetime.now() - START)
     KEYS = ['p', 'em class']
@@ -74,10 +77,12 @@ for k, WEIGHT in WEIGHTS.items():
     DATA = DATA.join(DS1, on='em class')
     P = CLUSTER.cluster_centers_
     CENTRES = gp.GeoDataFrame(data=DATA, geometry=gp.points_from_xy(*(P.T))).set_crs(CRS)
-    CENTRES.to_crs(CRS).to_file(FILEPATHB, driver='GPKG', layer=f'fit {k} grid {N}')
-    KEYS = ['p', 'em class', 'geometry']
-    BKM = GRID[KEYS].dissolve(by='em class', aggfunc='sum')
-    BKM = BKM.join(DS1)
-    BKM.to_crs(CRS).to_file(FILEPATHB, driver='GPKG', layer=f'fit boundary {k} grid {N}')
+    CENTRES.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer=f'fit {k} grid {N}')
+    POINTS = np.asarray(CENTRES['geometry'].apply(lambda v: np.array(v.xy)).to_list()).reshape(-1, 2)
+    FIELDS = ['em class', 'p', 'name']
+    VORONOI, _ = voronoi_frames(POINTS, clip=BOUNDARY.envelope[0])
+    VORONOI = gp.clip(VORONOI.set_crs(CRS), BOUNDARY['geometry']).sort_index()
+    VORONOI[FIELDS] = DATA[FIELDS]
+    VORONOI.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer=f'fit boundary {k} grid {N}')
 
 print(dt.datetime.now() - START)
