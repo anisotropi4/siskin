@@ -2,30 +2,32 @@
 
 import os
 import datetime as dt
-from itertools import product
 
-import numpy as np
 import pandas as pd
 import geopandas as gp
 from shapely.geometry import Polygon
 from scipy.spatial import cKDTree
 
-from herbert.base import archive
+from fiona.errors import DriverError
+
+from herbert.base import archive, append_gf
 import herbert.geometry as hg
+import herbert.people as hp
 
 pd.set_option('display.max_columns', None)
 
 START = dt.datetime.now()
 
 print('Load_boundaries')
-FILEPATH = 'bkm64.gpkg'
 
 CRS = hg.readupdate_crs('EPSG:32630')
 
+FILEPATH = 'bkm64.gpkg'
+LAYER = 'fit2 p2 boundary'
 try:
     BOUNDARIES
 except NameError:
-    BOUNDARIES = gp.read_file(FILEPATH, layer='fit p2 boundary').to_crs(CRS)
+    BOUNDARIES = gp.read_file(FILEPATH, layer=LAYER).to_crs(CRS)
 
 print(dt.datetime.now() - START)
 print('Write boundaries centres and boxes')
@@ -36,104 +38,91 @@ BOXES = gp.GeoDataFrame(data=BOUNDARIES[KEYS],
                         geometry=BOUNDARIES.envelope).set_crs(CRS)
 
 print(dt.datetime.now() - START)
-LAYER = 'OA'
 print(f'Read geography {LAYER}')
 
+FILEPATH = 'grid.gpkg'
+LAYER = 'OA'
 try:
     GEOGRAPHY
 except NameError:
-    GEOGRAPHY = gp.read_file('geography.gpkg', layer=LAYER).to_crs(CRS)
-    GEOGRAPHY['geometry'] = GEOGRAPHY.centroid
+    GEOGRAPHY = gp.read_file(FILEPATH, layer=LAYER).to_crs(CRS)
 
-FILEPATH = 'output/east-midlands.gpkg'
-archive(FILEPATH)
-CENTRES.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer='centres')
-BOXES.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer='boundaries')
+OUTPATH = 'east-midlands.gpkg'
+archive(OUTPATH)
+CENTRES.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer='centres')
+BOXES.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer='boundaries')
 
-D = 4096.0
-
-FILESTUB = os.path.basename(FILEPATH).split('.')[0]
-FILEDIR = os.path.dirname(FILEPATH)
-
-def get_heatmap(points, gf, k, n=15):
-    tree = cKDTree(hg.get_points(gf))
-    grid = hg.get_points(points)
-    d, i = tree.query(grid, n)
-
-    weights = gf[k]
-    if (d == 0.0).any():
-        d = d.T[1:].T
-        i = i.T[1:].T
-
-    u = 1.0E3 / d.sum(1)
-    v = (1.0 * weights.values[i] / d).sum(1)
-    w = (1.0 * weights.values[i] * weights.values[i] / d).sum(1)
-    return gp.GeoDataFrame(data={'distance': u, 'weight': v, 'weight2': w},
-                           geometry=points['geometry']).set_crs(CRS)
-
+R = 128
 D = 2048
 
-TOWNS = gp.GeoDataFrame(columns=['name', 'distance', 'weight', 'weight2',
+TOWNS = gp.GeoDataFrame(columns=['name', 'distance', 'p', 'p2',
                                  'area', 'population', 'geometry'], dtype=int)
 
 EMCLASSES = [1, 10, 15, 21, 34, 45, 48]
-IDX0 = BOUNDARIES[BOUNDARIES['class'].isin(EMCLASSES)].index
+GF = BOUNDARIES[BOUNDARIES['class'].isin(EMCLASSES)]
 
-for C, BOUNDARY in BOUNDARIES.loc[IDX0].iterrows():
+FIELDS = ['area', 'population', 'sarea', 'geometry']
+GF[FIELDS].dissolve(aggfunc='sum').to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer='boundary')
+
+for i, boundary in GF.iterrows():
+    #if i != 34:
+    #    continue
     print(dt.datetime.now() - START)
-    CENTRE = hg.get_point(CENTRES.loc[C])
+    centre = hg.get_point(CENTRES.loc[i])
 
-    XR, YR = hg.get_extent(BOUNDARY, D)
-    print(f'Create {C + 1} of {BOUNDARIES.shape[0]}: {XR} x {YR} grid {D}m')
-
-    MESH = hg.get_meshframe(BOUNDARY, CENTRE, D)
-    N = 512
-    print(dt.datetime.now() - START)
-    print(f'Create heatmap {N} connections')
-    HEATMAP = get_heatmap(MESH, GEOGRAPHY, 'population', N)
-    HEATMAP['class'] = C
-
-    idx1 = gp.clip(GEOGRAPHY['geometry'], BOUNDARY['geometry']).index
-
-    FIELDS = ['area', 'population']
-    TOWNS.loc[C, FIELDS] = GEOGRAPHY.loc[idx1, FIELDS].sum()
-    idx2 = HEATMAP['weight'].idxmax()
-    FIELDS = ['distance', 'weight', 'weight2', 'geometry']
-    TOWNS.loc[C, FIELDS] = HEATMAP.loc[idx2, FIELDS]
-    TOWNS['name'] = f'T{str(C).zfill(3)}'
-    squares = hg.get_squares(hg.get_points(HEATMAP), D / 2.0, 0.2)
-    HEATMAP['geometry'] = [Polygon(v) for v in squares]
-
-    print(dt.datetime.now() - START)
-    print('Write heatmap')
-    FILEPATHB = f'{FILEDIR}/{FILESTUB}-{str(C+1).zfill(2)}.gpkg'
-    archive(FILEPATHB)
-    HEATMAP.to_crs(CRS).to_file(FILEPATHB, driver='GPKG', layer=f'heatmap {D}m')
-
-    R = 128
     N = 32
-    XR, YR = hg.get_extent(BOUNDARY, R)
-    print(f'Create {C + 1} of {BOUNDARIES.shape[0]}: {XR} x {YR} grid {R}m')
-
-    MESH = hg.get_meshframe(BOUNDARY, CENTRE, R)
+    n, m = hg.get_extent(boundary, R)
+    print(f'Create {i + 1} of {BOUNDARIES.shape[0]}: {n} x {m} grid {R}m')
+    mesh = hg.get_meshframe(boundary, centre, R)
     print(dt.datetime.now() - START)
     print(f'Create gridmap {N} connections')
-    GRID = MESH.sjoin_nearest(GEOGRAPHY, max_distance=8192.0)
-    GRID['p'] = GRID['density'] * R * R / 1.0E6
-    GRID['p'] = GRID['p'] * BOUNDARY['population'] / GRID['p'].sum()
-    HEATMAP = get_heatmap(MESH, GRID, 'p', 32)
-    K = BOUNDARY['population'] / HEATMAP['weight'].sum()
-
-    print(f'Ratio v to population {K}')
-    HEATMAP['p'] = HEATMAP['weight'] * K
-    HEATMAP['class'] = C
-    squares = hg.get_squares(hg.get_points(HEATMAP), R / 2.0, 0.2)
-    HEATMAP['geometry'] = [Polygon(v) for v in squares]
+    grid = mesh.sjoin_nearest(GEOGRAPHY, max_distance=8192.0)
+    grid['p'] = grid['density'] * R * R / 1.0E6
+    grid['p'] = grid['p'] * boundary['population'] / grid['p'].sum()
+    heatgrid = hp.get_heatframe(mesh, grid, 'p', N)
+    heatgrid = heatgrid.rename(columns={'weight': 'p', 'weight2': 'p2'})
+    kscale = boundary['population'] / heatgrid['p'].sum()
+    print(f'Ratio v to population {kscale}')
+    heatgrid['p'] = heatgrid['p'] * kscale
+    heatgrid['class'] = i
 
     print(dt.datetime.now() - START)
     print('Write gridmap')
-    HEATMAP.to_crs(CRS).to_file(FILEPATHB, driver='GPKG', layer=f'gridmap {R}m')
+    #OUTPATH = f'{FILEDIR}/{FILESTUB}-{str(i+1).zfill(2)}.gpkg'
+    #archive(OUTPATH)
+    append_gf(heatgrid.to_crs(CRS), OUTPATH, f'gridmap {R}m', CRS)
+
+    heatmap = hp.get_heatmap(mesh, grid, i, R, N, 'p')
+    heatmap = heatmap.rename(columns={'weight2': 'p2'})
+    heatmap['p'] = heatmap['weight'] * kscale
+
+    print(dt.datetime.now() - START)
+    print('Write heatmap')
+    append_gf(heatmap.to_crs(CRS), OUTPATH, f'heatmap {R}m', CRS)
+
+    N = 512
+    n, m = hg.get_extent(boundary, D)
+    print(f'Create {i + 1} of {BOUNDARIES.shape[0]}: {n} x {m} grid {D}m')
+    mesh = hg.get_meshframe(boundary, centre, D)
+    print(dt.datetime.now() - START)
+    print(f'Create heatmap {N} connections')
+    heatmap = hp.get_heatmap(mesh, GEOGRAPHY, i, D)
+    heatmap = heatmap.rename(columns={'weight': 'p', 'weight2': 'p2'})
+
+    print(dt.datetime.now() - START)
+    print('Write heatmap')
+    append_gf(heatmap.to_crs(CRS), OUTPATH, f'heatmap {D}m', CRS)
+
+    idx1 = gp.clip(GEOGRAPHY['geometry'], boundary['geometry']).index
+    FIELDS = ['area', 'population']
+    TOWNS.loc[i, FIELDS] = GEOGRAPHY.loc[idx1, FIELDS].sum()
+    idx2 = heatmap['p'].idxmax()
+    FIELDS = ['distance', 'p', 'p2']
+    TOWNS.loc[i, FIELDS] = heatmap.loc[idx2, FIELDS]
+    TOWNS.loc[i, 'geometry'] = mesh.loc[idx2, 'geometry']
+    TOWNS['name'] = f'T{str(i).zfill(3)}'
 
 TOWNS['name'] = [f'C{str(i).zfill(3)}' for i in range(1, TOWNS.shape[0] + 1)]
 TOWNS = TOWNS.set_crs(CRS)
-TOWNS.to_crs(CRS).to_file(FILEPATHB, driver='GPKG', layer='cities')
+TOWNS.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer='cities')
+
