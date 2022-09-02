@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-import os
-
 import pandas as pd
 import geopandas as gp
 
@@ -47,7 +45,7 @@ SCB['population'] = SCB['population'].round().astype(int)
 SCB = SCB.join(DF0, on='DataZone')
 SCB['Country'] = 'Scotland'
 
-print('Mid-year population error: {}'.format(abs(SCB['population'].sum() - DS1.sum())))
+print(f'Mid-year population error: {abs(SCB["population"].sum() - DS1.sum())}')
 KEYS = {'code': 'OA', 'DataZone': 'LSOA', 'SHAPE_1_Ar': 'area'}
 FIELDS = ['OA', 'LSOA', 'MSOA', 'Country', 'area', 'population']
 POPULATION = SCB.rename(columns=KEYS)[FIELDS]
@@ -141,7 +139,9 @@ print('Write LSOA geography')
 LSOA.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer='LSOA')
 
 CENTROID = LSOA.centroid.rename('geometry')
-gp.GeoDataFrame(LSOA.drop('geometry', axis=1), geometry=CENTROID).to_crs(CRS).to_file(GRIDPATH, driver='GPKG', layer='LSOA')
+GRID = gp.GeoDataFrame(LSOA.drop('geometry', axis=1), geometry=CENTROID)
+GRID.to_crs(CRS).to_file(GRIDPATH, driver='GPKG', layer='LSOA')
+del GRID
 
 print('Aggregate MSOA geography')
 MSOA = LSOA.dissolve(by='MSOA', aggfunc='sum')
@@ -151,14 +151,17 @@ DS5 = POPULATION[KEYS].drop_duplicates().set_index('MSOA')
 MSOA = MSOA.join(DS5).reset_index()
 FIELDS = ['MSOA', 'Country', 'area', 'population', 'density', 'geometry']
 MSOA = MSOA[FIELDS]
+del LSOA
 
 print('Write MSOA geography')
 MSOA.to_crs(CRS).to_file(FILEPATH, driver='GPKG', layer='MSOA')
 
 CENTROID = MSOA.centroid.rename('geometry')
-gp.GeoDataFrame(MSOA.drop('geometry', axis=1), geometry=CENTROID).to_crs(CRS).to_file(GRIDPATH, driver='GPKG', layer='MSOA')
+GRID = gp.GeoDataFrame(MSOA.drop('geometry', axis=1), geometry=CENTROID)
+GRID.to_crs(CRS).to_file(GRIDPATH, driver='GPKG', layer='MSOA')
+del GRID
 
-print(f'Write GB outline')
+print('Write GB outline')
 OUTER = MSOA['geometry'].apply(make_valid)
 OUTER = OUTER.reset_index().dissolve()
 OUTER = OUTER.explode(ignore_index=True).drop(columns='index')
@@ -166,6 +169,7 @@ OUTER['geometry'] = OUTER.exterior
 OUTER['geometry'] = OUTER['geometry'].apply(Polygon)
 OUTER['area'] = OUTER.area
 OUTER = OUTER.sort_values('area', ascending=False).reset_index(drop=True)
+del MSOA
 
 BRITAIN = OUTER[OUTER['area'] > 1.0E8].copy()
 BRITAIN['geometry'] = BRITAIN.simplify(10, preserve_topology=False)
@@ -177,6 +181,7 @@ BRITAIN.to_file('britain.gpkg', driver='GPKG', layer='outer')
 GS2 = OUTER.centroid
 G = BRITAIN.loc[0, 'geometry']
 IDX1 = GS2.within(G)
-OUTER = OUTER.loc[IDX1]
+IDX2 = OUTER['area'] > 1.0E8
+OUTER = OUTER.loc[IDX1 & IDX2]
 
 OUTER.to_file(FILEPATH, driver='GPKG', layer='outer')
