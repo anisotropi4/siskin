@@ -11,11 +11,11 @@ do
     fi
 done
 
-echo Download Scotland mid-year estimates 2020
-FILE=sape-20-all-tabs-and-figs.zip
+echo Download Scotland mid-year estimates 2021
+FILE=sape-21-all-tabs-and-figs.zip
 if [ ! -s data/${FILE} ]; then
     echo here
-    URL='https://www.nrscotland.gov.uk/files//statistics/population-estimates/sape-20/'
+    URL='https://www.nrscotland.gov.uk/files/statistics/population-estimates/sape-20/'
     curl -o data/${FILE} "${URL}/${FILE}"
 fi
 
@@ -25,7 +25,7 @@ fi
 
 FILE=OA_DZ_IZ_2011.xlsx
 if [ ! -s data/${FILE} ]; then
-    URL='https://www.nrscotland.gov.uk/files//geography/2011-census/'
+    URL='https://www.nrscotland.gov.uk/files/geography/2011-census/'
     curl -o data/${FILE} "${URL}/${FILE}"
 fi
 
@@ -36,8 +36,26 @@ if [ ! -s data/${FILE} ]; then
     mv "data/OA_DZ_IZ_2011 Lookup.tsv" data/${FILE}
 fi
 
-echo Try England and Wales mid-year estimates 2020
-if [ $(ls data/sape23dt10* 2> /dev/null | wc -l) -lt 10 ]   
+echo Download Scotland MHW OA geography
+
+FILE=output-area-2011-mhw.zip
+if [ ! -s data/${FILE} ]; then
+    URL="https://www.nrscotland.gov.uk/files/geography/"
+    curl -o data/${FILE} ${URL}/${FILE}
+fi
+
+STUB=OutputArea2011_MHW
+if [ ! -s data/${STUB}.shp ]; then
+    (cd data; unzip ${FILE})
+fi
+
+FILE=OA-2011-boundaries-SC-BFC.gpkg
+if [ ! -s data/${FILE} ]; then
+    ogr2ogr -f GPKG data/${FILE} data/${STUB}.shp -t_srs EPSG:32630
+fi
+
+echo Download England and Wales mid-year estimates 2020
+if [ $(ls data/sape23dt10* 2> /dev/null | wc -l) -lt 10 ]
 then
     echo Download England and Wales mid-year estimates 2020
    ./download-ew.py
@@ -63,23 +81,6 @@ if [ ! -s data/${FILE} ]; then
     curl -L -o data/${FILE} "${URI}"
 fi
 
-echo Download Scotland MHW OA geography
-
-FILE=output-area-2011-mhw.zip
-if [ ! -s data/${FILE} ]; then    
-    URL="https://www.nrscotland.gov.uk/files/geography/"
-    curl -o data/${FILE} ${URL}/${FILE}
-fi
-
-STUB=OutputArea2011_MHW
-if [ ! -s data/${STUB}.shp ]; then
-    (cd data; unzip ${FILE})
-fi
-
-FILE=OA-2011-boundaries-SC-BFC.gpkg
-if [ ! -s data/${FILE} ]; then
-    ogr2ogr -f GPKG data/${FILE} data/${STUB}.shp -t_srs EPSG:32630
-fi
 
 echo Download England and Wales MHW OA geography
 FILE=OA-2011-boundaries-EW-BFC.geojson
@@ -94,18 +95,12 @@ if [ ! -s data/${FILE} ]; then
     ogr2ogr -f GPKG data/${STUB}.gpkg data/${STUB}.geojson -t_srs EPSG:32630
 fi
 
-FILE=OA-2011-boundaries-SC-BFC.gpkg
-if [ ! -s data/${FILE} ]; then
-    STUB=$(echo ${FILE} | sed 's/.gpkg$//')
-    ogr2ogr -f GPKG data/${STUB}.gpkg data/${STUB}.geojson 
-fi
-
 if [ ! -s geography.gpkg ]; then
     ./geography.py
 fi
 
 if [ ! -s bkm64.gpkg ]; then
-    ./batchkmeans5.py
+    ./batchkmeans7.py
 fi
 
 if [ ! -s heatmap.gpkg ]; then
@@ -122,10 +117,10 @@ if [ ! -s em-grid.gpkg ]; then
     ./batchkmeans-em.py
 fi
 
-if [ ! -s network-em.gpkg ]; then
-    ./network-em3.py
+if [ ! -s clusters-em-10k.gpkg ]; then
+    ./clusters2.py
 fi
 
 if [ ! -s SHP/routes.shp ]; then
-    ogr2ogr SHP/ network-em.gpkg -t_srs EPSG:4277
+    ogr2ogr SHP/ network-em-10k.gpkg -t_srs EPSG:4277
 fi
