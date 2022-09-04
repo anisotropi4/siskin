@@ -61,7 +61,6 @@ try:
 except NameError:
     GRID = gp.read_file(FILEPATH, layer=LAYER).to_crs(CRS)
 
-CENTRES = hg.get_points(GRID)
 LAYER = 'fit boundary p grid 1024'
 print(dt.datetime.now() - START)
 print(f'Load {LAYER}')
@@ -69,9 +68,6 @@ try:
     BOUNDARY
 except NameError:
     BOUNDARY = gp.read_file(FILEPATH, layer=LAYER).to_crs(CRS)
-
-print(dt.datetime.now() - START)
-BOUNDARY.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer='boundary')
 
 def get_convexhull(boundary):
     gf = boundary.copy()
@@ -98,6 +94,7 @@ print('Get convex hull boundaries')
 HBOUNDARY = get_convexhull(BOUNDARY)
 HBOUNDARY.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer='hboundary')
 
+del BOUNDARY
 print(dt.datetime.now() - START)
 print('Get clipped boundary')
 
@@ -128,17 +125,21 @@ def get_clusters(boundary, p_index, grid):
     gf1['class'] = -1
     points = hg.get_points(grid.loc[p_index])
     gf1.loc[p_index, 'class'] = agglomerate_cluster(p_index, points)
-    gf1 = gf1[gf1['class'] >= 0].dissolve(by='class')
-    gf1 = gf1.explode(index_parts=False).reset_index()
-    gf1['cluster'] = gf1.index
-    fields = ['cluster', 'population', 'geometry']
-    gf2 = gp.sjoin(grid, gf1[['cluster', 'geometry']]).drop(columns='index_right')
-    ds = gf2[['cluster', 'p']].groupby('cluster').sum()
-    gf1['population'] = ds
+    gf2 = gf1.loc[gf1['class'] >= 0, ['class', 'geometry']].dissolve(by='class')
+    gf2 = gf2.explode(index_parts=False).reset_index()
+    gf2['cluster'] = gf2.index
+    gf3 = gp.sjoin(grid[['geometry', 'p']], gf2).drop(columns='index_right')
+
+    gf1 = gf1.loc[gf3.index]
+    gf1.loc[gf3.index, 'cluster'] = gf3['cluster']
+    gf1 = gf1[['p', 'geometry', 'cluster']].dissolve(by='cluster', aggfunc='sum').reset_index()
+    gf1['name'] = 'T' + (gf1.index + 1).map(str).str.zfill(3)
+
+    gf2 = gf3.reset_index().rename(columns={'index': 'em class'})
     gf2 = gf2.sort_values(['cluster', 'p']).drop_duplicates(subset='cluster', keep='last')
-    gf2 = gf2.set_index('cluster')
-    gf2['population'] = ds
-    return (gf1[fields], gf2.reset_index())
+    gf2 = gf2.reset_index(drop=True).drop(columns='class')
+    gf2[['name', 'population']] = gf1[['name', 'p']]
+    return (gf1, gf2)
 
 print(dt.datetime.now() - START)
 print('Get clusters and nodes')
