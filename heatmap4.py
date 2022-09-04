@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
-import os
 import datetime as dt
 
 import pandas as pd
 import geopandas as gp
 
-from scipy.spatial import Delaunay
+import scipy as sp
 
 from herbert.base import archive, append_gf
 import herbert.geometry as hg
@@ -102,7 +101,7 @@ TOWNS[FIELDS] = TOWNS[FIELDS].astype(int)
 TOWNS.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer='towns')
 
 POINTS = hg.get_points(TOWNS)
-TRIANGLES = Delaunay(POINTS)
+TRIANGLES = sp.spatial.Delaunay(POINTS)
 
 LINES = hg.get_lines(TRIANGLES.simplices, TOWNS['name'].values, POINTS, CRS)
 LINES['km'] = LINES.length / 1.0E3
