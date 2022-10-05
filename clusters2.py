@@ -7,14 +7,11 @@ import numpy as np
 import pandas as pd
 import geopandas as gp
 
-from shapely.validation import make_valid
-from shapely.geometry import LineString, Polygon
+from shapely.geometry import LineString
 
 #from scipy.spatial.distance import pdist
 
-from libpysal.weights import Delaunay, Gabriel
-from libpysal.cg import voronoi_frames, alpha_shape, alpha_shape_auto
-from libpysal.weights import Rook
+from libpysal.weights import Delaunay
 
 from sklearn.cluster import AgglomerativeClustering
 
@@ -23,7 +20,6 @@ from networkx.utils import pairwise
 #from networkx.algorithms.flow import maximum_flow_value
 
 import herbert.geometry as hg
-import momepy
 
 #ff08E8
 pd.set_option('display.max_columns', None)
@@ -35,7 +31,8 @@ REGION = 'wessex'
 REGION = 'em'
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='create ab initio transport network based on population')
+    parser = argparse.ArgumentParser(
+        description='create ab initio transport network based on population')
     parser.add_argument('region', type=str, help='region name',
                         nargs='?', default='em')
     parser.add_argument('-p', dest='population', type=float,
@@ -114,12 +111,15 @@ print(dt.datetime.now() - START)
 print('agglomerate clusters')
 
 def agglomerate_cluster(this_index, points):
-    ACF = AgglomerativeClustering(n_clusters=None, distance_threshold=65536.0, linkage='ward', compute_distances=True)
+    ACF = AgglomerativeClustering(n_clusters=None,
+                                  distance_threshold=65536.0,
+                                  linkage='ward',
+                                  compute_distances=True)
     this_fit = ACF.fit(points)
     return pd.Series(index=this_index, data=this_fit.labels_)
 
 def get_clusters(boundary, p_index, grid):
-    """ returns GeoDataFrames with cluster extent and cluster point corresponding to point with largest population
+    """ returns GeoDataFrames with cluster extent and point with largest population
     """
     gf1 = boundary.copy()
     gf1['class'] = -1
@@ -212,7 +212,8 @@ def get_path_list(mx, links, weight='weight'):
 
 IDX7 = DEDGES.set_index(['source', 'target']).index
 LX = nx.MultiDiGraph([(*IDX7[i], {'leg': k, 'id': i})
-               for i, j in enumerate(get_path_list(MX, EDGES[['em source', 'em target']].values, 'distance'))
+               for i, j in enumerate(
+                       get_path_list(MX, EDGES[['em source', 'em target']].values, 'distance'))
                for k in pairwise(j)])
 
 print(dt.datetime.now() - START)
@@ -254,8 +255,7 @@ DF6 = DF6.set_index(['source', 'target'])
 LEGS = LEGS.set_index(['source', 'target'])
 
 FIELDS = ['em source', 'em target', 'count', 'direction', 'distance']
-DF7 = pd.DataFrame(data=0, index=LEGS.index, columns=FIELDS+list(range(DF6.shape[0])), )
-DF7[FIELDS] = LEGS[FIELDS]
+DF7 = pd.DataFrame(data=LEGS[FIELDS], index=LEGS.index, columns=FIELDS+list(range(DF6.shape[0])), )
 
 for i, k in enumerate(DF6.index):
     R = nx.flow.preflow_push(FX, *k)
@@ -288,7 +288,8 @@ print('Calculate network route')
 
 GF10 = gp.GeoDataFrame(data=DF7, geometry=LEGS['geometry'])
 GF10 = GF10.set_crs(CRS)
-GF10[['em source', 'em target']] = np.array(LEGS[['em source', 'em target']].apply(sorted, axis=1).to_list())
+GF10[['em source', 'em target']] = np.array(
+    LEGS[['em source', 'em target']].apply(sorted, axis=1).to_list())
 GF10.columns = [str(i) for i in GF10.columns]
 #SCALE = 2 * (DF6['p*p'] * DF6['p*p']).sum() / (DF6['distance'] * DF6['distance']).sum()
 SCALE = 2 * (DF6['p*p']).sum() / (DF6['distance']).sum()
