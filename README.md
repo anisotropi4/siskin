@@ -25,7 +25,34 @@ Download the latest mid-year population estimates in 2011 Census Output Area (OA
 
 ### Combine Population and Geography
 
-  | 
+ |
 -|-
 ![outer](outer.png) | The Output Area (OA) population boundary is created by transforming the Scots from Data-Zone to OA and combining this with the English and Wales to create an OA layer `GeoPackage` file. Combining this OA data to create Super Output Area (LSOA) and Middle Super Output Area (MSOA) layers, see ONS coding systems [here](https://en.wikipedia.org/wiki/ONS_coding_system), Additional OA centroid and Great Britain boundary layers.
+
 ## Create 64 arbitrary regions
+## batchkmeans7
+Applying the `sklearn` KMeans clustering algorithm MiniBatchKMeans algorithm to the census Output Area (OA) population data to split the geography into 64 clusters
+https://scikit-learn.org/stable/modules/generated/sklearn.cluster.MiniBatchKMeans.html
+
+The OA geography centroids weight based on population^2 labels the 64 cluster centres and OA geography regions. These labeled centroid point layer are linked to the OA geography and aggregated to give 64 regional geographies.
+
+However, the KMeans centroid points geography have issues with disconnected geographies, for example where there are rivers, estuaries or islands.
+
+To address this the next step is to split aggregated OA regional geographies at these geographical features, re-label on the following criteria and re-aggregate into 64 adjusted geographies:
+
+1. aggregate all sub-region within a kmeans OA region that have an area smaller than 1 km^2 and greater 500 km^2
+2. Join the remaining regions to cluster label by longest shared-edge length.
+3. Where no shared edge exists leave the cluster label
+
+Aggregate using this adjusted cluster label and calculate the associated population, and identify a logical centre based Middle Super Output Area (MSOA) density.
+
+Alternative batch OA KMeans weights investigated were:
+1. distance
+2. population
+3. population^2
+4. density * population
+5. density * population^2
+6. 1 / area
+
+## heatmap4
+
