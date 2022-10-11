@@ -311,10 +311,17 @@ GF11 = GF11.reset_index()
 GF11['direction'] = 'B'
 GF11['distance'] = GF11.length
 GF11 = GF11[GF10.columns]
+
+GF11['scale'] = GF11['sum'] / SCALE
 GF11.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer='sum')
 
 print(dt.datetime.now() - START)
 print('Calculate network scale')
 
-GF11['scale'] = GF11['sum'] / SCALE
+# Total number of trips per day TTD 12,470,000
+PTPD = GF11['sum'].sum() / 12470000
+PTPH = PTPD * 12.7
+GF11['peak trip per day'] = GF11['sum'] / PTPD
+GF11['peak trip per hour'] = GF11['sum'] / PTPH
+GF11['w'] = GF11['peak trip per hour'] // 500
 GF11.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer='scale')
