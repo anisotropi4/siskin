@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Ab initio transport network based on population distribution"""
 import datetime as dt
 import argparse
 
@@ -32,7 +33,7 @@ REGION = 'em'
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='create ab initio transport network based on population')
+        description='create ab initio transport network based on population distribution')
     parser.add_argument('region', type=str, help='region name',
                         nargs='?', default='em')
     parser.add_argument('-p', dest='population', type=float,
@@ -110,21 +111,21 @@ pIDX = HGRID[HGRID['p'] > 10.0E3].index
 print(dt.datetime.now() - START)
 print('agglomerate clusters')
 
-def agglomerate_cluster(this_index, points):
+def agglomerate_cluster(this_index, points, d):
     ACF = AgglomerativeClustering(n_clusters=None,
-                                  distance_threshold=65536.0,
+                                  distance_threshold=d,
                                   linkage='ward',
                                   compute_distances=True)
     this_fit = ACF.fit(points)
     return pd.Series(index=this_index, data=this_fit.labels_)
 
-def get_clusters(boundary, p_index, grid):
+def get_clusters(boundary, p_index, grid, d=65536.0):
     """ returns GeoDataFrames with cluster extent and point with largest population
     """
     gf1 = boundary.copy()
     gf1['class'] = -1
     points = hg.get_points(grid.loc[p_index])
-    gf1.loc[p_index, 'class'] = agglomerate_cluster(p_index, points)
+    gf1.loc[p_index, 'class'] = agglomerate_cluster(p_index, points, d)
     gf2 = gf1.loc[gf1['class'] >= 0, ['class', 'geometry']].dissolve(by='class')
     gf2 = gf2.explode(index_parts=False).reset_index()
     gf2['cluster'] = gf2.index
