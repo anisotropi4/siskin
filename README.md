@@ -54,5 +54,20 @@ Alternative batch OA KMeans weights investigated were:
 5. density * population^2
 6. 1 / area
 
+## east-midlands
+Having identified the regions that make up the East-Midlands from the 64 regions above, (labels 1, 10, 15, 21, 34, 45, 48), create a population and population density heatmap centroid point and geography layers, consisting of squares edge-length 128m and 2km (area ~0.164m^2 and 4.194 km^2 respectively).
+
+## batchkmeans-em
+Apply the `sklearn` KMeans clustering algorithm MiniBatchKMeans algorithm to the 1,299,312 points in the 128m point layer for the East Midlands layer from the previous heatmap, to create 1024 sub-regions.
+
+Aggregate these sub-regions to create new centroid point and associate Voronoi polygons layers bounded by the East-Midlands geography. Voronoi polygons are created using the pysal `voronoi_frames` implementation
+
+
+# Notes
+
 ## heatmap4
+The heatmap4 code breaks the national geography into a series of 4km^2 and 64km^2 square population and density heatmaps. This national heatmap was used during development and testing but is not needed
+
+## network-all
+The network-all consists of the many test cases and algorithms used to develop the approach used in the the cluster and flow implementation.
 
