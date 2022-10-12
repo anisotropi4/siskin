@@ -1,4 +1,4 @@
-# siskin
+﻿# siskin
 An approach to the creation of an ab initio transport network model for Great Britain
 
 ## Base Population and Geography
@@ -66,7 +66,7 @@ Aggregate these sub-regions to create new centroid point and associate Voronoi p
 
 Adjust the 1024 sub-region boundaries from the prior KMeans clustering to remove internal features, such as rivers, at a distance of about 1km from the outer geographic boundary, and the associated centroid points to sit within these boundaries.
 
-Identify and aggregate sub-regions with a population > 10,000 up to a centroid distance of about 64km to form 45 grouped urban population centres using the `sklearn` `AgglomerativeClustering` algorith. This recursively merges pair of clusters of sample data up to a maximum linkage distance.
+Identify and aggregate sub-regions with a population > 10,000 up to a centroid distance of about 64km to form 45 grouped urban population centres using the `sklearn` `AgglomerativeClustering` algorithm. This recursively merges pair of clusters of sample data up to a maximum linkage distance.
 
 Use the Python Spacial Analysis Library `Delaunay` algorithm to create a Delaunay network to connect between the 1024 centroid with edges pruned to sit within the region boundary. This provides edges to connect the urban population centres in the next step.
 
@@ -74,9 +74,9 @@ Create a second shortest path Delaunay network between the 45 grouped urban popu
 
 Calculate the transport demand edge-weight from the product of the source and target population between the 45 grouped urban population centres divided by edge length.
 
-Recursively apply the `NetworkX` network analysis `preflow_push` algorith to calculate a shortest-path network edge weight as follows:
+Recursively apply the `NetworkX` network analysis `preflow_push` algorithm to calculate a shortest-path network edge weight as follows:
 
-* Use the `preflow_push` algorith to calculate maximum single-commodity flow between each pair of the 45 grouped urban population centres
+* Use the `preflow_push` algorithm to calculate maximum single-commodity flow between each pair of the 45 grouped urban population centres
 * Sum these directional flow values to calculate total flow between the 45 grouped urban population 
 * Sum the directed flow to calculate the undirected flow value
 * Sum the flow across each shared edge in the shortest-path network
