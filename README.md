@@ -62,6 +62,26 @@ Apply the `sklearn` KMeans clustering algorithm MiniBatchKMeans algorithm to the
 
 Aggregate these sub-regions to create new centroid point and associate Voronoi polygons layers bounded by the East-Midlands geography. Voronoi polygons are created using the pysal `voronoi_frames` implementation
 
+## clusters2
+
+Adjust the 1024 sub-region boundaries from the prior KMeans clustering to remove internal features, such as rivers, at a distance of about 1km from the outer geographic boundary, and the associated centroid points to sit within these boundaries.
+
+Identify and aggregate sub-regions with a population > 10,000 up to a centroid distance of about 64km to form 45 grouped urban population centres using the `sklearn` `AgglomerativeClustering` algorith. This recursively merges pair of clusters of sample data up to a maximum linkage distance.
+
+Use the Python Spacial Analysis Library `Delaunay` algorithm to create a Delaunay network to connect between the 1024 centroid with edges pruned to sit within the region boundary. This provides edges to connect the urban population centres in the next step.
+
+Create a second shortest path Delaunay network between the 45 grouped urban population centres and using edges connecting the pruned 1024 node sub-region network.
+
+Calculate the transport demand edge-weight from the product of the source and target population between the 45 grouped urban population centres divided by edge length.
+
+Recursively apply the `NetworkX` network analysis `preflow_push` algorith to calculate a shortest-path network edge weight as follows:
+
+* Use the `preflow_push` algorith to calculate maximum single-commodity flow between each pair of the 45 grouped urban population centres
+* Sum these directional flow values to calculate total flow between the 45 grouped urban population 
+* Sum the directed flow to calculate the undirected flow value
+* Sum the flow across each shared edge in the shortest-path network
+
+The TEMPRO model predicts 12.47M total number of trips per day and 2.94M total number of trips at AM peak (07:00-10:00) in 2050. The expected passenger flow is then scaled as a fraction of the total trips per day and per hour of the total sum of the edge flow weights.
 
 # Notes
 
