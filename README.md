@@ -1,5 +1,5 @@
 ﻿# siskin
-An approach to the creation of an ab initio transport network model for Great Britain
+An approach to the creation of an ab initio transport network model for the East Midlands region of Great Britain. We model an idealised transport network model describing scaled peak hour and per day trips between population centres in the region based on trip estimates for 2050. Using mid-year 2020 population estimates to generate a set of sub-regions corresponding to the East Midlands, aggregate areas with > 10k population and apply network flow algorithms to generate the network scaled using the TEMPro transport network 2050 trip per day estimates
 
 ## Base Population and Geography
 
@@ -31,8 +31,7 @@ Download the latest mid-year population estimates in 2011 Census Output Area (OA
 
 ## Create 64 arbitrary regions
 ## batchkmeans7
-Applying the `sklearn` KMeans clustering algorithm MiniBatchKMeans algorithm to the census Output Area (OA) population data to split the geography into 64 clusters
-https://scikit-learn.org/stable/modules/generated/sklearn.cluster.MiniBatchKMeans.html
+Applying the `sklearn` KMeans `MiniBatchKMeans` algorithm documented [here](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.MiniBatchKMeans.html) to the census Output Area (OA) population data to split the geography into 64 clusters
 
 The OA geography centroids weight based on population^2 labels the 64 cluster centres and OA geography regions. These labeled centroid point layer are linked to the OA geography and aggregated to give 64 regional geographies.
 
@@ -60,28 +59,30 @@ Having identified the regions that make up the East-Midlands from the 64 regions
 ## batchkmeans-em
 Apply the `sklearn` KMeans clustering algorithm MiniBatchKMeans algorithm to the 1,299,312 points in the 128m point layer for the East Midlands layer from the previous heatmap, to create 1024 sub-regions.
 
-Aggregate these sub-regions to create new centroid point and associate Voronoi polygons layers bounded by the East-Midlands geography. Voronoi polygons are created using the pysal `voronoi_frames` implementation
+Aggregate these sub-regions to create new centroid point and associate Voronoi polygons layers bounded by the East-Midlands geography. Voronoi polygons are created using the pysal `voronoi_frames` implementation documented [here](https://pysal.org/libpysal/generated/libpysal.cg.voronoi_frames.html)
 
 ## clusters2
 
 Adjust the 1024 sub-region boundaries from the prior KMeans clustering to remove internal features, such as rivers, at a distance of about 1km from the outer geographic boundary, and the associated centroid points to sit within these boundaries.
 
-Identify and aggregate sub-regions with a population > 10,000 up to a centroid distance of about 64km to form 45 grouped urban population centres using the `sklearn` `AgglomerativeClustering` algorithm. This recursively merges pair of clusters of sample data up to a maximum linkage distance.
+Identify and aggregate sub-regions with a population > 10,000 up to a centroid distance of about 64km to form 45 grouped urban population centres using the `sklearn` `AgglomerativeClustering` algorithm. This recursively merges pair of clusters of sample data up to a maximum linkage distance. The `AgglomerativeClustering` algorithm is documented [here](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.AgglomerativeClustering.html)
 
-Use the Python Spacial Analysis Library `Delaunay` algorithm to create a Delaunay network to connect between the 1024 centroid with edges pruned to sit within the region boundary. This provides edges to connect the urban population centres in the next step.
+Use the  Python Spacial Analysis Library (pysal) `Delaunay` algorithm to create a Delaunay network to connect between the 1024 centroid with edges pruned to sit within the region boundary. This provides edges to connect the urban population centres in the next step. The Delaunay algorithm is documented [here](https://pysal.org/libpysal/generated/libpysal.weights.Delaunay.html)
 
 Create a second shortest path Delaunay network between the 45 grouped urban population centres and using edges connecting the pruned 1024 node sub-region network.
 
 Calculate the transport demand edge-weight from the product of the source and target population between the 45 grouped urban population centres divided by edge length.
 
-Recursively apply the `NetworkX` network analysis `preflow_push` algorithm to calculate a shortest-path network edge weight as follows:
+Recursively apply the `NetworkX` network analysis [library](https://networkx.org/) `preflow_push` algorithm to calculate a shortest-path network edge weight as follows:
 
 * Use the `preflow_push` algorithm to calculate maximum single-commodity flow between each pair of the 45 grouped urban population centres
 * Sum these directional flow values to calculate total flow between the 45 grouped urban population 
 * Sum the directed flow to calculate the undirected flow value
 * Sum the flow across each shared edge in the shortest-path network
 
-The TEMPRO model predicts 12.47M total number of trips per day and 2.94M total number of trips at AM peak (07:00-10:00) in 2050. The expected passenger flow is then scaled as a fraction of the total trips per day and per hour of the total sum of the edge flow weights.
+The TEMPro model predicts 12.47M total number of trips per day and 2.94M total number of trips at AM peak (07:00-10:00) in 2050. The expected passenger flow is then scaled as a fraction of the total trips per day and per hour of the total sum of the edge flow weights.
+
+The `preflow_push` algorithm is documented [here](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.flow.preflow_push.html), while details around the Trip End Model Presentation Program (TEMPro) are [here](https://www.gov.uk/government/publications/tempro-downloads)
 
 # Notes
 
@@ -90,4 +91,3 @@ The heatmap4 code breaks the national geography into a series of 4km^2 and 64km^
 
 ## network-all
 The network-all consists of the many test cases and algorithms used to develop the approach used in the the cluster and flow implementation.
-
