@@ -1,5 +1,5 @@
 ﻿# siskin
-An approach to the creation of an ab initio transport network model for the East Midlands region of Great Britain. We model an idealised transport network model describing scaled peak hour and per day trips between population centres in the region based on trip estimates for 2050. Using mid-year 2020 population estimates to generate a set of sub-regions corresponding to the East Midlands, aggregate areas with > 10k population and apply network flow algorithms to generate the network scaled using the TEMPro transport network 2050 trip per day estimates
+An approach to the creation of an ab initio transport network model for the East Midlands region of Great Britain. We model an idealised transport network describing scaled peak hour and per day trips between population centres in the region based on estimates for 2050. After algorithmically generating a set of sub-regions corresponding to the East Midlands using mid-year 2020 population estimates, areas with > 10k population were aggregated and network flow algorithms applied to generate the network, scaled using the TEMPro transport network 2050 trip estimates.
 
 ## Base Population and Geography
 
