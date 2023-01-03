@@ -101,7 +101,7 @@ Active and rail modal share in the East Midlands is low when compared to regions
 |Bus/Coach   |   15%|           7%|
 |Rail        |   19%|           2%|
 
-* Driver or Passenger
+\* driver or passenger
 
 As the current East Midlands modal share is likely too low, investment in a denser rail network would increase modal share if only by making more rail journeys available
 
@@ -123,9 +123,9 @@ While international comparisons are hard due to differing data collection and cl
 |Bus   |   21%|           9%|   6%|
 |Rail* |   26%|           3%|  60%|
 
-* includes subway and metro
+\* includes subway and metro journeys
 
-Data [Urban Japan 2009 Passengers Carried within Three Largest Cities](https://www.stat.go.jp/english/data/nenkan/65nenkan/1431-13.html)
+From [Urban Japan 2009 Passengers Carried within Three Largest Cities](https://www.stat.go.jp/english/data/nenkan/65nenkan/1431-13.html)
 
 ## Future Development
 
