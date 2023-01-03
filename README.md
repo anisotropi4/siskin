@@ -1,5 +1,5 @@
-﻿# siskin
-An approach to the creation of an ab initio transport network model for the East Midlands region of Great Britain. We model an idealised transport network describing scaled peak hour and per day trips between population centres in the region based on estimates for 2050. After algorithmically generating a set of sub-regions corresponding to the East Midlands using mid-year 2020 population estimates, areas with > 10k population were aggregated and network flow algorithms applied to generate the network, scaled using the TEMPro transport network 2050 trip estimates.
+# siskin
+An approach to the creation of an ab initio transport network model for Great Britain
 
 ## Base Population and Geography
 
@@ -25,13 +25,14 @@ Download the latest mid-year population estimates in 2011 Census Output Area (OA
 
 ### Combine Population and Geography
 
-![outer](outer.png)
+![outer](outer.png) 
 
 The Output Area (OA) population boundary is created by transforming the Scots from Data-Zone to OA and combining this with the English and Wales to create an OA layer `GeoPackage` file. Combining this OA data to create Super Output Area (LSOA) and Middle Super Output Area (MSOA) layers, see ONS coding systems [here](https://en.wikipedia.org/wiki/ONS_coding_system), Additional OA centroid and Great Britain boundary layers.
 
 ## Create 64 arbitrary regions
 ## batchkmeans7
-Applying the `sklearn` KMeans `MiniBatchKMeans` algorithm documented [here](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.MiniBatchKMeans.html) to the census Output Area (OA) population data to split the geography into 64 clusters
+Applying the `sklearn` KMeans clustering algorithm MiniBatchKMeans algorithm to the census Output Area (OA) population data to split the geography into 64 clusters
+https://scikit-learn.org/stable/modules/generated/sklearn.cluster.MiniBatchKMeans.html
 
 The OA geography centroids weight based on population^2 labels the 64 cluster centres and OA geography regions. These labeled centroid point layer are linked to the OA geography and aggregated to give 64 regional geographies.
 
@@ -59,30 +60,78 @@ Having identified the regions that make up the East-Midlands from the 64 regions
 ## batchkmeans-em
 Apply the `sklearn` KMeans clustering algorithm MiniBatchKMeans algorithm to the 1,299,312 points in the 128m point layer for the East Midlands layer from the previous heatmap, to create 1024 sub-regions.
 
-Aggregate these sub-regions to create new centroid point and associate Voronoi polygons layers bounded by the East-Midlands geography. Voronoi polygons are created using the pysal `voronoi_frames` implementation documented [here](https://pysal.org/libpysal/generated/libpysal.cg.voronoi_frames.html)
+Aggregate these sub-regions to create new centroid point and associate Voronoi polygons layers bounded by the East-Midlands geography. Voronoi polygons are created using the [pysal](https://pysal.org) `voronoi_frames` implementation
 
 ## clusters2
 
 Adjust the 1024 sub-region boundaries from the prior KMeans clustering to remove internal features, such as rivers, at a distance of about 1km from the outer geographic boundary, and the associated centroid points to sit within these boundaries.
 
-Identify and aggregate sub-regions with a population > 10,000 up to a centroid distance of about 64km to form 45 grouped urban population centres using the `sklearn` `AgglomerativeClustering` algorithm. This recursively merges pair of clusters of sample data up to a maximum linkage distance. The `AgglomerativeClustering` algorithm is documented [here](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.AgglomerativeClustering.html)
+Identify and aggregate sub-regions with a population > 10k up to a centroid distance of about 64km to form 45 grouped urban population centres using the `sklearn` `AgglomerativeClustering` algorithm. This recursively merges pair of clusters of sample data up to a maximum linkage distance.
 
-Use the  Python Spacial Analysis Library (pysal) `Delaunay` algorithm to create a Delaunay network to connect between the 1024 centroid with edges pruned to sit within the region boundary. This provides edges to connect the urban population centres in the next step. The Delaunay algorithm is documented [here](https://pysal.org/libpysal/generated/libpysal.weights.Delaunay.html)
+Use the Python Spacial Analysis Library `Delaunay` algorithm to create a Delaunay network to connect between the 1024 centroid with edges pruned to sit within the region boundary. This provides edges to connect the urban population centres in the next step.
 
 Create a second shortest path Delaunay network between the 45 grouped urban population centres and using edges connecting the pruned 1024 node sub-region network.
 
 Calculate the transport demand edge-weight from the product of the source and target population between the 45 grouped urban population centres divided by edge length.
 
-Recursively apply the `NetworkX` network analysis [library](https://networkx.org/) `preflow_push` algorithm to calculate a shortest-path network edge weight as follows:
+Recursively apply the `NetworkX` network analysis `preflow_push` algorithm to calculate a shortest-path network edge weight as follows:
 
 * Use the `preflow_push` algorithm to calculate maximum single-commodity flow between each pair of the 45 grouped urban population centres
 * Sum these directional flow values to calculate total flow between the 45 grouped urban population 
 * Sum the directed flow to calculate the undirected flow value
 * Sum the flow across each shared edge in the shortest-path network
 
-The TEMPro model predicts 12.47M total number of trips per day and 2.94M total number of trips at AM peak (07:00-10:00) in 2050. The expected passenger flow is then scaled as a fraction of the total trips per day and per hour of the total sum of the edge flow weights.
+The expected passenger flow is then scaled as a fraction of the total trips per day and per hour of the total sum of the edge flow weights
 
-The `preflow_push` algorithm is documented [here](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.flow.preflow_push.html), while details around the Trip End Model Presentation Program (TEMPro) are [here](https://www.gov.uk/government/publications/tempro-downloads)
+## Rail Modal Share
+
+The Department of [Transport Trip End Model Presentation Program (TEMPro) software](https://www.gov.uk/government/publications/tempro-downloads) allows users to forecast trips by geographical area, transport mode and years of interest until 2051
+
+We use 2050 TEMPro model estimates of 12.47M total trips per day and 2.94M total number of trips at AM peak (07:00-10:00) to scale the total calculated East Midlands edge flow weights and then with an ambitious peak time range of 25% and 35% in 2050 for rail modal share as discussed below
+
+### East Midlands Rail Trip Modal Share Estimates 
+
+Active and rail modal share in the East Midlands is low when compared to regions with much higher public transport provision such as London:
+
+|AM Peak 2021|London|East Midlands|
+|------------|------|-------------|
+|Walking     |   24%|          22%|
+|Cycling     |    2%|           2%|
+|Car*        |   39%|          67%|
+|Bus/Coach   |   15%|           7%|
+|Rail        |   19%|           2%|
+
+* Driver or Passenger
+
+As the current East Midlands modal share is likely too low, investment in a denser rail network would increase modal share if only by making more rail journeys available
+
+A dense rail network with faster rail journeys is likely to displace medium-long journey rather than short bus or car journeys, noting that a dense rail network will never compete the number of bus or tram pick-up locations
+
+It is then unrealistic to  100% of trips to will not be by rail as, for example, the most dense rail network would only displace very few walking and cycling trips
+
+While London car mode share is still significant, public transport share is 3.7 times more in London compared to the East Midlands, 
+
+Reflecting a 2050 target which reduces the total amount of energy required for transport purposes to deliver climate change targets suggests a greater use of public/collective transport and reduced use of personal transport suggesting a plausible rail modal share between current peak usage of 25% and 35% 
+
+### International Comparisons
+
+While international comparisons are hard due to differing data collection and classification. As the Japanese data does not include active travel, a comparison with the previous UK data excluding active travel
+
+|Mode  |London|East Midlands|Japan|
+|------|------|-------------|-----|
+|Car   |   53%|          88%|  34%|
+|Bus   |   21%|           9%|   6%|
+|Rail* |   26%|           3%|  60%|
+
+* includes subway and metro
+
+Data [Urban Japan 2009 Passengers Carried within Three Largest Cities](https://www.stat.go.jp/english/data/nenkan/65nenkan/1431-13.html)
+
+## Future Development
+
+TEMPro is being developed to include a range of future 'Common Analytical Scenarios' to account for current uncertainties in behaviour and economic circumstances arising from Covid, climate change, war et al, and when finished should be used to update the estimates used  
+
+England and Wales travel-to-work 2011 and 2021 Census flow Middle-Super Output Area (MSOA) data should also be explored as a way to provide separate travel flow estimates.    
 
 # Notes
 
