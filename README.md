@@ -87,7 +87,7 @@ The expected passenger flow is then scaled as a fraction of the total trips per 
 
 The Department of [Transport Trip End Model Presentation Program (TEMPro) software](https://www.gov.uk/government/publications/tempro-downloads) allows users to forecast trips by geographical area, transport mode and years of interest until 2051
 
-We use 2050 TEMPro model estimates of 12.47M total trips per day and 2.94M total number of trips at AM peak (07:00-10:00) to scale the total calculated East Midlands edge flow weights and then with an ambitious peak time range of 25% and 35% in 2050 for rail modal share as discussed below
+We use 2050 TEMPro model estimates of 12.47M total trips per day and 2.94M total number of trips at AM peak (07:00-10:00) to scale the total calculated East Midlands edge flow weights and then with an ambitious peak time range of 15% and 30% in 2050 for rail modal share as discussed below as these reflect 
 
 ### East Midlands Rail Trip Modal Share Estimates 
 
@@ -107,15 +107,27 @@ As the current East Midlands modal share is likely too low, investment in a dens
 
 A dense rail network with faster rail journeys is likely to displace medium-long journey rather than short bus or car journeys, noting that a dense rail network will never compete the number of bus or tram pick-up locations
 
-It is then unrealistic to  100% of trips to will not be by rail as, for example, the most dense rail network would only displace very few walking and cycling trips
-
 While London car mode share is still significant, public transport share is 3.7 times more in London compared to the East Midlands, 
 
-Reflecting a 2050 target which reduces the total amount of energy required for transport purposes to deliver climate change targets suggests a greater use of public/collective transport and reduced use of personal transport suggesting a plausible rail modal share between current peak usage of 25% and 35% 
+### National Rail Trip Modal Share 
+
+The National Travel Survey (NTS) 2019 provides a modal share for different trip lengths [NTS0308](https://www.gov.uk/government/statistical-data-sets/nts03-modal-comparisons)
+
+|Travel Distance| Active |    Car* | Public |
+|---------------|--------|---------|--------|
+|  < 1 mile     |  19.6% |    4.4% |   0.2% |
+|  1-5 miles    |   7.9% |   31.4% |   4.8% |
+|  5-10 miles   |   0.2% |   12.5% |   2.5% |
+|  10+ miles    |   0.1% |   13.6% |   2.7% |
+|    Total      |  27.9% |   61.9% |  10.2% |
+
+\* car, van or motorcycle driver or passenger
+
+This suggests a plausible 2050 rail modal share target of 15% and 25% for peak journeys. Despite the need to reduce the total amount of energy required for transport to deliver climate change targets through a greater use of public/collective transport a 100% shift from car to rail is unrealistic. Given that even the most dense rail network would displace few walking and cycling trips, and that for journeys under five miles a tram or bus is more likely to displace car use  
 
 ### International Comparisons
 
-While international comparisons are hard due to differing data collection and classification. As the Japanese data does not include active travel, a comparison with the previous UK data excluding active travel
+While international comparisons are hard due to differing data collection and classification. As the Japanese data excludes active travel, a comparison with the previous UK data excluding active travel suggests a plausible uplift of up to a doubling of subway, metro and rail travel by 2050
 
 |Mode  |London|East Midlands|Japan|
 |------|------|-------------|-----|
