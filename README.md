@@ -1,5 +1,10 @@
 # siskin
-An approach to the creation of an ab initio transport network model for Great Britain
+
+An approach to the creation of an ab initio transport network model for regions of Great Britain
+
+Using census geography and 2020 mid-year population estimates to model population distribution, peak hourly passenger rail journey for 2050 are estimated between the 10k population centres in an idealised East Midlands region. These estimated are based on a theoretical network flow normalised by 2050 peak AM hour estimates scaled by an ambitious rail modal share estimates of 15% and 30%
+
+![Peak 30% Estimate](Peak_Hour_Flow_01.png) 
 
 ## Base Population and Geography
 
@@ -87,7 +92,7 @@ The expected passenger flow is then scaled as a fraction of the total trips per 
 
 The Department of [Transport Trip End Model Presentation Program (TEMPro) software](https://www.gov.uk/government/publications/tempro-downloads) allows users to forecast trips by geographical area, transport mode and years of interest until 2051
 
-We use 2050 TEMPro model estimates of 12.47M total trips per day and 2.94M total number of trips at AM peak (07:00-10:00) to scale the total calculated East Midlands edge flow weights and then with an ambitious peak time range of 15% and 30% in 2050 for rail modal share as discussed below as these reflect 
+We use 2050 TEMPro model estimates of 12.47M total trips per day and 2.94M total number of trips at AM peak (07:00-10:00) to scale the total calculated East Midlands edge flow weights. An ambitious rail modal share estimates of 15% and 30% in 2050 are then used to derive normalised peak capacity estimates
 
 ### East Midlands Rail Trip Modal Share Estimates 
 
@@ -148,7 +153,7 @@ England and Wales travel-to-work 2011 and 2021 Census flow Middle-Super Output A
 # Notes
 
 ## heatmap4
-The heatmap4 code breaks the national geography into a series of 4km^2 and 64km^2 square population and density heatmaps. This national heatmap was used during development and testing but is not needed
+The `heatmap4.py` code breaks the national geography into a series of 4km^2 and 64km^2 square population and density heatmaps. This national heatmap was used during development and testing but is not used here
 
 ## network-all
-The network-all consists of the many test cases and algorithms used to develop the approach used in the the cluster and flow implementation.
+The `network-all.py` script consists of the many test cases and algorithms used to develop the approach used in the the cluster and flow implementation.
