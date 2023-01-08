@@ -96,7 +96,7 @@ del BOUNDARY
 print(dt.datetime.now() - START)
 print('Get clipped boundary')
 
-ALLBOUNDARIES = gp.clip(HBOUNDARY, OUTER.loc[0, 'geometry'])
+ALLBOUNDARIES = gp.clip(HBOUNDARY, OUTER.loc[0, 'geometry']).sort_index()
 ALLBOUNDARIES.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer='allboundary')
 HGRID = ALLBOUNDARIES.copy()
 HGRID['geometry'] = HGRID.centroid
@@ -318,10 +318,15 @@ GF11.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer='sum')
 print(dt.datetime.now() - START)
 print('Calculate network scale')
 
-# Total number of trips per day TTD 12,470,000
+# Total number of EM trips per day TTD 12,470,000
+# Total number of EM trips AM peak (07:00-10:00) 2.94M
+# Total number of EM trips AM peak hour 2.94M / 3 = 0.98M
 PTPD = GF11['sum'].sum() / 12470000
-PTPH = PTPD * 12.7
+PTPH = PTPD * 12.47 / 0.98
 GF11['peak trip per day'] = GF11['sum'] / PTPD
 GF11['peak trip per hour'] = GF11['sum'] / PTPH
+GF11['r15%'] = GF11['peak trip per hour'] * 0.15
+GF11['r30%'] = GF11['peak trip per hour'] * 0.30
 GF11['w'] = GF11['peak trip per hour'] // 500
+
 GF11.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer='scale')
