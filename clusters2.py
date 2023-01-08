@@ -6,6 +6,8 @@ import argparse
 import numpy as np
 
 import pandas as pd
+import os
+os.environ['USE_PYGEOS'] = '0'
 import geopandas as gp
 
 from shapely.geometry import LineString
@@ -26,6 +28,7 @@ import herbert.geometry as hg
 pd.set_option('display.max_columns', None)
 
 #start at 10k population
+P = 5.0E3
 P = 10.0E3
 REGION = 'wales'
 REGION = 'wessex'
@@ -106,7 +109,7 @@ HGRID.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer='hgrid')
 print(dt.datetime.now() - START)
 
 print('Get towns')
-pIDX = HGRID[HGRID['p'] > 10.0E3].index
+pIDX = HGRID[HGRID['p'] > P].index
 
 print(dt.datetime.now() - START)
 print('agglomerate clusters')
@@ -132,8 +135,10 @@ def get_clusters(boundary, p_index, grid, d=65536.0):
     gf3 = gp.sjoin(grid[['geometry', 'p']], gf2).drop(columns='index_right')
 
     gf1 = gf1.loc[gf3.index]
-    gf1.loc[gf3.index, 'cluster'] = gf3['cluster']
-    gf1 = gf1[['p', 'geometry', 'cluster']].dissolve(by='cluster', aggfunc='sum').reset_index()
+    #gf1.loc[gf3.index, 'cluster'] = gf3['cluster']
+    gf1['cluster'] = gf3['cluster']
+    fields = ['p', 'geometry', 'cluster']
+    gf1 = gf1[fields].dissolve(by='cluster', aggfunc='sum').reset_index()
     gf1['name'] = 'T' + (gf1.index + 1).map(str).str.zfill(3)
 
     gf2 = gf3.reset_index().rename(columns={'index': 'em class'})
@@ -257,6 +262,7 @@ LEGS = LEGS.set_index(['source', 'target'])
 
 FIELDS = ['em source', 'em target', 'count', 'direction', 'distance']
 DF7 = pd.DataFrame(data=LEGS[FIELDS], index=LEGS.index, columns=FIELDS+list(range(DF6.shape[0])), )
+DF7 = DF7.fillna(0).astype({i: np.integer for i in list(range(DF6.shape[0]))})
 
 for i, k in enumerate(DF6.index):
     R = nx.flow.preflow_push(FX, *k)
@@ -302,7 +308,7 @@ print('Calculate network sum')
 
 M = GF10.shape[1]
 FIELDS = GF10.columns.take(list(range(7, M))).insert(0, 'em source').insert(1, 'em target')
-DF8 = GF10[FIELDS].groupby(['em source', 'em target']).sum()
+DF8 = GF10[FIELDS].groupby(['em source', 'em target']).sum(numeric_only=True)
 
 LEGS = LEGS.set_index(['em source', 'em target'])
 GF11 = gp.GeoDataFrame(DF8.join(LEGS[['source', 'target', 'count', 'geometry']]))
