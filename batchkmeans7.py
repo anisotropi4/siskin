@@ -4,6 +4,9 @@ import datetime as dt
 from joblib import cpu_count
 
 import pandas as pd
+
+import os
+os.environ['USE_PYGEOS'] = '0'
 import geopandas as gp
 from shapely.geometry import Polygon
 from sklearn.cluster import MiniBatchKMeans
@@ -74,7 +77,7 @@ for k, WEIGHT in WEIGHTS.items():
     print('Write model')
     print(dt.datetime.now() - START)
     KEYS = ['area', 'population', 'class']
-    DATA = GEOGRAPHY[KEYS].groupby('class').sum().reset_index()
+    DATA = GEOGRAPHY[KEYS].groupby('class').sum(numeric_only=True).reset_index()
     CENTRES = gp.GeoDataFrame(DATA, geometry=gp.points_from_xy(*CLUSTER.cluster_centers_.T)).set_crs(CRS)
     CENTRES.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer=f'fit {k}')
 print(dt.datetime.now() - START)
@@ -109,7 +112,8 @@ BKM = SPLIT[KEYS].dissolve(by='class', aggfunc='first')
 BKM['area'] = BKM.area
 
 POPULATION = gp.GeoDataFrame(data=GEOGRAPHY['population'], geometry=GEOGRAPHY.centroid)
-DF1 = BKM.reset_index()[['class', 'geometry']].sjoin(POPULATION).groupby('class').sum()
+DF1 = BKM.reset_index()[['class', 'geometry']].sjoin(POPULATION)
+DF1 = DF1.groupby('class').sum(numeric_only=True)
 BKM['population'] = DF1['population']
 
 BKM.to_crs(CRS).to_file(OUTPATH, driver='GPKG', layer=f'fit {KEY} boundary')
@@ -167,8 +171,8 @@ BKM2 = SPLIT.dissolve(by='class', aggfunc='first').reset_index()
 BKM2['area'] = BKM2.area
 
 GF5 = gp.sjoin(BKM2[['class', 'geometry']], POPULATION, how='left')
-DF1 = GF5[['class', 'population']].groupby('class').sum()
-BKM2['population'] = DF1
+DF1 = GF5[['class', 'population']].groupby('class').sum(numeric_only=True)
+BKM2['population'] = DF1['population']
 
 IDX5 = POPULATION.index.difference(GF5.set_index('index_right').index)
 GF6 = gp.sjoin_nearest(POPULATION.loc[IDX5], BKM2[['class', 'geometry']], how='left')
