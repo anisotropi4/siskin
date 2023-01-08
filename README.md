@@ -35,17 +35,17 @@ Download the latest mid-year population estimates in 2011 Census Output Area (OA
 The Output Area (OA) population boundary is created by transforming the Scots from Data-Zone to OA and combining this with the English and Wales to create an OA layer `GeoPackage` file. Combining this OA data to create Super Output Area (LSOA) and Middle Super Output Area (MSOA) layers, see ONS coding systems [here](https://en.wikipedia.org/wiki/ONS_coding_system), Additional OA centroid and Great Britain boundary layers.
 
 ## Create 64 arbitrary regions
+![64 GB KMeans Clusters](bkm64.png)
 ## batchkmeans7
-Applying the `sklearn` KMeans clustering algorithm MiniBatchKMeans algorithm to the census Output Area (OA) population data to split the geography into 64 clusters
-https://scikit-learn.org/stable/modules/generated/sklearn.cluster.MiniBatchKMeans.html
+Applying the [`scikit-learn`](https://scikit-learn.org) KMeans clustering algorithm [`MiniBatchKMeans`](https://scikit-learn.org/stable/modules/clustering.html#mini-batch-kmeans) algorithm to the census Output Area (OA) population data to split the geography into 64 clusters
 
-The OA geography centroids weight based on population^2 labels the 64 cluster centres and OA geography regions. These labeled centroid point layer are linked to the OA geography and aggregated to give 64 regional geographies.
+The OA geography centroids weight based on population<sup>2</sup> labels the 64 cluster centres and OA geography regions. These labeled centroid point layer are linked to the OA geography and aggregated to give 64 regional geographies
 
-However, the KMeans centroid points geography have issues with disconnected geographies, for example where there are rivers, estuaries or islands.
+However, the KMeans centroid points geography have issues with disconnected geographies, for example where there are rivers, estuaries or islands
 
 To address this the next step is to split aggregated OA regional geographies at these geographical features, re-label on the following criteria and re-aggregate into 64 adjusted geographies:
 
-1. aggregate all sub-region within a kmeans OA region that have an area smaller than 1 km^2 and greater 500 km^2
+1. aggregate all sub-region within a kmeans OA region that have an area smaller than 1 km<sup>2</sup> and greater then 500 km<sup>2</sup>
 2. Join the remaining regions to cluster label by longest shared-edge length.
 3. Where no shared edge exists leave the cluster label
 
@@ -54,16 +54,16 @@ Aggregate using this adjusted cluster label and calculate the associated populat
 Alternative batch OA KMeans weights investigated were:
 1. distance
 2. population
-3. population^2
-4. density * population
-5. density * population^2
-6. 1 / area
+3. population<sup>2</sup>
+4. density . population
+5. density . population<sup>2</sup>
+6. area<sup>-1</sup>
 
 ## east-midlands
-Having identified the regions that make up the East-Midlands from the 64 regions above, (labels 1, 10, 15, 21, 34, 45, 48), create a population and population density heatmap centroid point and geography layers, consisting of squares edge-length 128m and 2km (area ~0.164m^2 and 4.194 km^2 respectively).
+Having identified the regions that make up the East-Midlands from the 64 regions above, (labels 1, 10, 15, 21, 34, 45, 48), create a population and population density heatmap centroid point and geography layers, consisting of squares edge-length 128m and 2km (approximate area 0.164 km<sup>2</sup> and 4.194 km<sup>2</sup> respectively).
 
 ## batchkmeans-em
-Apply the `sklearn` KMeans clustering algorithm MiniBatchKMeans algorithm to the 1,299,312 points in the 128m point layer for the East Midlands layer from the previous heatmap, to create 1024 sub-regions.
+Apply the `scikit-learn` KMeans clustering algorithm MiniBatchKMeans algorithm to the 1,299,312 points in the 128m point layer for the East Midlands layer from the previous heatmap, to create 1024 sub-regions.
 
 Aggregate these sub-regions to create new centroid point and associate Voronoi polygons layers bounded by the East-Midlands geography. Voronoi polygons are created using the [pysal](https://pysal.org) `voronoi_frames` implementation
 
@@ -71,7 +71,7 @@ Aggregate these sub-regions to create new centroid point and associate Voronoi p
 
 Adjust the 1024 sub-region boundaries from the prior KMeans clustering to remove internal features, such as rivers, at a distance of about 1km from the outer geographic boundary, and the associated centroid points to sit within these boundaries.
 
-Identify and aggregate sub-regions with a population > 10k up to a centroid distance of about 64km to form 45 grouped urban population centres using the `sklearn` `AgglomerativeClustering` algorithm. This recursively merges pair of clusters of sample data up to a maximum linkage distance.
+Identify and aggregate sub-regions with a population > 10k up to a centroid distance of about 64km to form 45 grouped urban population centres using the `scikit-learn` `AgglomerativeClustering` algorithm. This recursively merges pair of clusters of sample data up to a maximum linkage distance.
 
 Use the Python Spacial Analysis Library `Delaunay` algorithm to create a Delaunay network to connect between the 1024 centroid with edges pruned to sit within the region boundary. This provides edges to connect the urban population centres in the next step.
 
@@ -153,7 +153,7 @@ England and Wales travel-to-work 2011 and 2021 Census flow Middle-Super Output A
 # Notes
 
 ## heatmap4
-The `heatmap4.py` code breaks the national geography into a series of 4km^2 and 64km^2 square population and density heatmaps. This national heatmap was used during development and testing but is not used here
+The `heatmap4.py` code breaks the national geography into a series of 4 km<sup>2</sup> and 64 km<sup>2</sup> square population and density heatmaps. This national heatmap was used during development and testing but is not used here
 
 ## network-all
 The `network-all.py` script consists of the many test cases and algorithms used to develop the approach used in the the cluster and flow implementation.
